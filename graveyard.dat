@@ -1,0 +1,209 @@
+#define JB_BX        0
+#define JB_SI        1
+#define JB_DI        2
+#define JB_BP        3
+#define JB_SP        4
+#define JB_PC        5
+#define JB_SIZE 	24
+
+
+void ex(void){
+
+	asm volatile ("movl $0x1, %%eax;"         /* SYS_exit is 1 */
+	    "xor %%ebx, %%ebx;"      /* Argument is in ebx, it is 0 */
+	    "int $0x80"            /* Enter kernel mode */
+	     :
+		 :
+		 :);
+
+	return;
+
+}
+
+int longjmp32(jmp_buf __env){
+
+	/*get ebx*/
+/*	asm volatile ("mov %0, %%ebx;"
+				  "mov %1, %%esi;"
+				  "mov %2, %%edi;"
+				  "mov %3, %%esp;"
+				  "mov %4, %%ebp;"
+				  "jmp *%0;"
+			:output
+			:"r" (__env[0].__jmpbuf[JB_BX]),  	input
+			"r" (__env[0].__jmpbuf[JB_SI]), 	input
+			"r" (__env[0].__jmpbuf[JB_DI]), 	input
+			"r" (__env[0].__jmpbuf[JB_SP]), 	input
+			"r" (__env[0].__jmpbuf[JB_BP]),		input
+			"r" (__env[0].__jmpbuf[JB_PC])		input
+			:clobbered register
+			);
+
+	printf("here\n");*/
+
+
+ 	/*get ebx*/
+ 		asm volatile ("movl %0, %%ebx;"
+ 				:									/*output*/
+ 				: "r" (__env[0].__jmpbuf[JB_BX])   	/*input*/
+ 				: 		    						/*clobbered register*/
+ 				);
+
+ 		/*get esi*/
+ 		asm volatile (	"mov %0, %%esi;"
+ 				:   /*output*/
+ 				:"r" (__env[0].__jmpbuf[JB_SI]) 		     /*input*/
+ 				:      /*clobbered register*/
+ 				);
+
+ 		/*get edi*/
+ 		asm volatile (	"mov %0, %%edi;"
+ 				:   /*output*/
+ 				:"r" (__env[0].__jmpbuf[JB_DI]) 		     /*input*/
+ 				:     /*clobbered register*/
+ 				);
+
+ 		/*get esp*/
+ 		//__env[0].__jmpbuf[JB_SP] = DecodeJMPBUF32(__env[0].__jmpbuf[JB_SP]);
+ 		asm volatile ("mov %0, %%esp;"
+ 				:   /*output*/
+ 		   		:"r" (__env[0].__jmpbuf[JB_SP]) 		     /*input*/
+ 		   		:     /*clobbered register*/
+ 		   		);
+
+
+ 		/*get ebp*/
+ 		asm volatile ("mov %0, %%ebp;"
+ 				:   /*output*/
+ 				:"r" (__env[0].__jmpbuf[JB_BP])		     /*input*/
+ 				:     /*clobbered register*/
+ 				);
+
+
+ 		/*jmp*/
+
+ 		//unsigned int pc = DecodeJMPBUF32(__env[0].__jmpbuf[JB_PC]);
+
+ 		//printf("pc 0x%08x\n", pc);
+
+ 		asm volatile (
+ 				"mov $0x1, %%eax;"
+ 				"jmp *%0;"
+ 				:   //output
+ 				:"d" (__env[0].__jmpbuf[JB_PC])		    // input
+ 				:    //clobbered register
+ 				);
+
+ 	 return 1;
+}
+
+int setjmp32(jmp_buf __env, unsigned int pc){
+
+	/* int eax = 0;
+
+	 asm volatile ("mov %%eax, %0"
+	  			:"=r" (eax)   output
+	  			: 		     input
+	  			: "%eax"     clobbered register
+
+	  			/*get ebx*/
+	/*asm volatile (
+				:"=r" (__env[0].__jmpbuf[JB_PC])   output
+				:input
+	 			:clobbered register
+	 			);*/
+
+
+
+
+	//
+
+	/*get ebx*/
+	asm volatile ("mov %%ebx, %0;"
+				"mov %%esi, %1;"
+				"mov %%edi, %2;"
+				"mov %%esp, %3;"
+				"mov %%ebp, %4;"
+				"mov 44(%%esp), %5;"
+	 			:"=r" (__env[0].__jmpbuf[JB_BX]),   /*output*/
+				"=r" (__env[0].__jmpbuf[JB_SI]),   /*output*/
+				"=r" (__env[0].__jmpbuf[JB_DI]),   /*output*/
+				"=r" (__env[0].__jmpbuf[JB_SP]),  /* output*/
+				"=r" (__env[0].__jmpbuf[JB_BP]),  /*output*/
+				"=r" (__env[0].__jmpbuf[JB_PC])   /*output*/
+	 			:/*input*/
+	 			:/*clobbered register*/
+	 			);
+
+	printf("pc 0x%08x\n", (unsigned int)__env[0].__jmpbuf[JB_PC]);
+
+
+	 /*get ip*/
+	 //__env[0].__jmpbuf[JB_PC] = EncodeJMPBUF32(pc);
+	// __env[0].__jmpbuf[JB_PC] = pc;
+
+/*
+ 	get ebx
+ 	asm volatile (	"mov $0x0, %%eax;"
+ 			"mov %%ebx, %%eax;"
+ 			"mov %%eax, %0;"
+ 			:"=r" (__env[0].__jmpbuf[JB_BX])   output
+ 			: 		     input
+ 			: "%eax"     clobbered register
+ 			);
+
+
+ 	get esi
+ 	asm volatile (	"mov $0x0, %%eax;"
+ 			"mov %%esi, %%eax;"
+ 			"mov %%eax, %0;"
+ 			:"=r" (__env[0].__jmpbuf[JB_SI])   output
+ 			: 		     input
+ 			: "%eax"     clobbered register
+ 			);
+
+ 	get edi
+ 	asm volatile (	"mov $0x0, %%eax;"
+ 			"mov %%edi, %%eax;"
+ 			"mov %%eax, %0;"
+ 			:"=r" (__env[0].__jmpbuf[JB_DI])   output
+ 			: 		     input
+ 			: "%eax"     clobbered register
+ 			);
+
+ 	get esp
+ 	asm volatile (	"mov $0x0, %%eax;"
+ 			"mov %%esp, %%eax;"
+ 			"mov %%eax, %0;"
+ 			:"=r" (__env[0].__jmpbuf[JB_SP])   output
+ 	   		: 		     input
+ 	   		: "%eax"     clobbered register
+ 	   		);
+ 	//__env[0].__jmpbuf[JB_SP] = EncodeJMPBUF32(__env[0].__jmpbuf[JB_SP]);
+
+ 	get ebp
+ 	asm volatile (	"mov $0x0, %%eax;"
+ 			"mov %%ebp, %%eax;"
+ 			"mov %%eax, %0;"
+ 			:"=r" (__env[0].__jmpbuf[JB_BP])   output
+ 			:		     input
+ 			: "%eax"     clobbered register
+ 			);
+
+*/
+
+ 	/*get ip*/
+ 	//__env[0].__jmpbuf[JB_PC] = EncodeJMPBUF32(pc);
+ 	//__env[0].__jmpbuf[JB_PC] = pc;
+
+
+
+ 	/*printf("ebp 0x%08x\n", (unsigned int) __env[0].__jmpbuf[JB_BP]);
+ 	printf("ebx %d\n", (unsigned int) __env[0].__jmpbuf[JB_BX]);
+ 	printf("esi %d\n", __env[0].__jmpbuf[JB_SI]);
+ 	printf("edi %d\n", __env[0].__jmpbuf[JB_DI]);
+ 	printf("esp 0x%08x\n", (unsigned int) __env[0].__jmpbuf[JB_SP]);
+ 	printf("eip 0x%08x\n", (unsigned int) __env[0].__jmpbuf[JB_PC]);*/
+
+ 	return 0;
+}
