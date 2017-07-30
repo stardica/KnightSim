@@ -1,10 +1,9 @@
-
 #DEsim
 LIB_NAME_64 = "libDESim64.a"
-CC_FLAGS_64 = -g -O3 -Wall
+CC_FLAGS_64 = -g3 -O3 -Wall
 
 LIB_NAME_32 = "libDESim32.a"
-CC_FLAGS_32 = -g -O3 -Wall -m32
+CC_FLAGS_32 = -g3 -O3 -Wall -m32
 
 CC = gcc
 
@@ -17,6 +16,7 @@ DESim64: tasking64.o wakeupcall64.o contexts64.o setjmp64.o longjmp64.o
 DESim32: tasking32.o wakeupcall32.o contexts32.o setjmp32.o longjmp32.o
 		ar -r $(LIB_NAME_32) tasking32.o wakeupcall32.o contexts32.o setjmp32.o longjmp32.o
 		@echo "Built $@ successfully"
+
 
 
 #64 bit versions
@@ -34,6 +34,7 @@ setjmp64.o: setjmp64.s
 
 longjmp64.o: longjmp64.s
 	$(CC) $(CC_FLAGS_64) longjmp64.s -c
+
 
 
 #32 bit versions
@@ -54,4 +55,3 @@ longjmp32.o: longjmp32.s
 
 clean:
 	rm -f *.o *.a
-

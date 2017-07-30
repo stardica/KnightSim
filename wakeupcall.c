@@ -242,6 +242,3 @@ void wakeupcall (void){
 
 	return;
 }
-
-
-

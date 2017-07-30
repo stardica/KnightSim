@@ -1,3 +1,58 @@
+//printf("pointer 1 0x%016x pointer 2 0x%016x\n", ((unsigned int)context_stub), (unsigned int)((char*)stack + n - 4));
+  //printf("pointer 1 0x%016x pointer 2 0x%016x\n", EncodeJMPBUF64((unsigned int)context_stub), EncodeJMPBUF64((unsigned int)((char*)stack + n - 4)));
+  
+  
+
+
+/*printf("decode.0 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[0]));
+   printf("decode.1 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[1]));
+   printf("decode.2 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[2]));
+   printf("decode.3 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[3]));
+   printf("decode.4 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[4]));
+   printf("decode.5 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[5]));
+   printf("decode.6 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[6]));*/
+   /*printf("decode.7 %d\n", (p->c.buf[0].__jmpbuf[7]));*/
+
+   /*addr2 = (p->c.buf[0].__jmpbuf[7]);*/
+
+  /*long long addr1, addr2, addr3;
+  addr1 = addr2 = addr3 = 0x0;*/
+
+ /*printf("decode.0 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[0]));
+   printf("decode.1 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[1]));
+   printf("decode.2 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[2]));
+   printf("decode.3 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[3]));
+   printf("decode.4 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[4]));
+   printf("decode.5 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[5]));
+   printf("decode.6 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[6]));*/
+   //printf("decode.7 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[7]));
+
+  /*addr1 = (p->c.buf[0].__jmpbuf[7]);
+
+	//addr3 = EncodeJMPBUF64((long long)addr1);
+
+	printf("addr1 %lld\n", addr1);
+
+	addr2 = DecodeJMPBUF64(addr1);
+
+	printf("addr2 0x%016x\n", (unsigned int) addr2);
+
+   addr3 = EncodeJMPBUF64(addr2);
+
+   printf("addr3 %lld\n", (addr1));*/
+
+
+
+
+
+
+
+
+
+
+
+
+
 #define JB_BX        0
 #define JB_SI        1
 #define JB_DI        2

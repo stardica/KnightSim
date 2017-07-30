@@ -19,11 +19,6 @@
 #include <signal.h>
 #include <sys/time.h>
 #include "contexts.h"
-//#include "setjmp64.s"
-//#include "longjmp64.s"
-
-//int longjmp32(jmp_buf __env);
-//int setjmp32(jmp_buf __env, unsigned int pc);
 
 //int * asm_mod_array(int *ptr,int size);
 
@@ -439,43 +434,22 @@ void context_init (process_t *p, void (*f)(void)){
   setjmp64_2(p->c.buf);
 #endif
 
-  printf("here2\n");
-  //exit(0);
-
-
-
-  /*int fren[5]={ 1, 2, 3, 4, 5 };
-
-  for(n = 0; n<5; n++)
-    {
-  	  printf("val %d\n", fren[n]);
-    }
-
-
-
-  printf("here\n");
-
-  asm_mod_array(fren, 5);
-
-  for(n = 0; n<5; n++)
-  {
-	  printf("val %d\n", fren[n]);
-  }*/
-
-
-
  /* printf("--------------\n");
-  printf("ebx %d\n", p->c.buf[0].__jmpbuf[0]);
-  printf("esi %d\n", p->c.buf[0].__jmpbuf[1]);
-  printf("edi %d\n", p->c.buf[0].__jmpbuf[2]);
-  printf("ebp 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[3]);
-  printf("esp 0x%08x\n", DecodeJMPBUF32((unsigned int) p->c.buf[0].__jmpbuf[4]));
-  printf("eip 0x%08x\n", DecodeJMPBUF32((unsigned int) p->c.buf[0].__jmpbuf[5]));
-  printf("--------------\n");
+  printf("buff 0 %ld\n", p->c.buf[0].__jmpbuf[0]);
+  printf("buff 1 %ld\n", p->c.buf[0].__jmpbuf[1]);
+  printf("buff 2 %ld\n", p->c.buf[0].__jmpbuf[2]);
+  printf("buff 3 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[3]);
+  printf("buff 4 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[4]);
+  printf("buff 5 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[5]);
+  printf("buff 6 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[6]);
+  printf("buff 7 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[7]);
 
-  getchar();*/
+  //DecodeJMPBUF64()''
+  //printf("esp 0x%08x\n", p->c.buf[0].__jmpbuf[4]);
+  //printf("eip 0x%08x\n", p->c.buf[0].__jmpbuf[5]);
+  printf("--------------\n");*/
 
-  /*return_here:
+   /*return_here:
   if(!setjmp32(p->c.buf, (unsigned int)&&return_here + 23))
   {
 
@@ -610,51 +584,22 @@ To fix this undef and redefine _FORTIFY_SOURCE to get things working again.*/
 
   printf("x86_64\n");
 
+  #define INIT_SP(p) ((char *)stack + n - 4);
+  #define CURR_SP(p) p->c.buf[0].__jmpbuf[4];
+
+  p->c.buf[0].__jmpbuf[7] = (long long)context_stub;
+  p->c.buf[0].__jmpbuf[6] = (long long)((char *)stack + n - 4);
+
+
+  /*if using clib
   #define INIT_SP(p) EncodeJMPBUF64((char *)stack + n - 4);
   #define CURR_SP(p) DecodeJMPBUF64((p)->c.buf[0].__jmpbuf[4])
 
-  /*printf("decode.0 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[0]));
-   printf("decode.1 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[1]));
-   printf("decode.2 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[2]));
-   printf("decode.3 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[3]));
-   printf("decode.4 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[4]));
-   printf("decode.5 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[5]));
-   printf("decode.6 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[6]));*/
-   /*printf("decode.7 %d\n", (p->c.buf[0].__jmpbuf[7]));*/
 
-   /*addr2 = (p->c.buf[0].__jmpbuf[7]);*/
+  p->c.buf[0].__jmpbuf[7] = EncodeJMPBUF64((long long)context_stub);
+  p->c.buf[0].__jmpbuf[6] = EncodeJMPBUF64((char *)stack + n - 4);*/
 
-  /*long long addr1, addr2, addr3;
-  addr1 = addr2 = addr3 = 0x0;*/
 
- /*printf("decode.0 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[0]));
-   printf("decode.1 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[1]));
-   printf("decode.2 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[2]));
-   printf("decode.3 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[3]));
-   printf("decode.4 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[4]));
-   printf("decode.5 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[5]));
-   printf("decode.6 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[6]));*/
-   //printf("decode.7 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[7]));
-
-  /*addr1 = (p->c.buf[0].__jmpbuf[7]);
-
-	//addr3 = EncodeJMPBUF64((long long)addr1);
-
-	printf("addr1 %lld\n", addr1);
-
-	addr2 = DecodeJMPBUF64(addr1);
-
-	printf("addr2 0x%016x\n", (unsigned int) addr2);
-
-   addr3 = EncodeJMPBUF64(addr2);
-
-   printf("addr3 %lld\n", (addr1));*/
-
-   p->c.buf[0].__jmpbuf[7] = EncodeJMPBUF64((long long)context_stub);
-   p->c.buf[0].__jmpbuf[6] = EncodeJMPBUF64((char *)stack + n - 4);
-
-  //printf("pointer 1 0x%016x pointer 2 0x%016x\n", ((unsigned int)context_stub), (unsigned int)((char*)stack + n - 4));
-  //printf("pointer 1 0x%016x pointer 2 0x%016x\n", EncodeJMPBUF64((unsigned int)context_stub), EncodeJMPBUF64((unsigned int)((char*)stack + n - 4)));
 
 
 #elif defined(__FreeBSD__) && defined(__i386__)
