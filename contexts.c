@@ -392,13 +392,17 @@ void context_switch (process_t *p)
 	  //_longjmp(p->c.buf,1);
 	  longjmp64_2(p->c.buf, 1);
   }
+
   if (terminated_process)
   {
 	  context_destroy (terminated_process);
 	  terminated_process = NULL;
   }
 
-  context_enable ();
+  //star removed this does nothing.
+  //context_enable ();
+
+  printf("context switch\n");
 
 }
 
@@ -425,8 +429,6 @@ void context_init (process_t *p, void (*f)(void)){
 
   n = p->c.sz;
 
-
-  printf("here1\n");
   //_setjmp (p->c.buf);
 #if defined(__linux__) && defined(__i386__)
   setjmp32_2(p->c.buf);
@@ -539,21 +541,24 @@ void context_init (process_t *p, void (*f)(void)){
    */
 
   printf("i386\n");
+  #define INIT_SP(p) (int)((char*)(p)->c.stack + (p)->c.sz)
+  #define CURR_SP(p) ((p)->c.buf[0].__jmpbuf[4])
 
-  //longjmp32(p->c.buf);
+  p->c.buf[0].__jmpbuf[5] = ((int)context_stub);
+  p->c.buf[0].__jmpbuf[4] = ((int)((char*)stack+n-4));
 
 
   /* This works with Ubuntu 12.04 (must be compiled 32 bit)*/
-  #define INIT_SP(p) (int)((char*)(p)->c.stack + (p)->c.sz)
-  #define CURR_SP(p) DecodeJMPBUF32((p)->c.buf[0].__jmpbuf[4])
+  //#define INIT_SP(p) (int)((char*)(p)->c.stack + (p)->c.sz)
+  //#define CURR_SP(p) DecodeJMPBUF32((p)->c.buf[0].__jmpbuf[4])
 
  /*newer versions of GCC enable stack protectors by default
 which breaks the way context.c works via _FORTIFY_SOURCE =1 or = 2
 To fix this undef and redefine _FORTIFY_SOURCE to get things working again.*/
 
 
-  p->c.buf[0].__jmpbuf[5] = EncodeJMPBUF32((int)context_stub);
-  p->c.buf[0].__jmpbuf[4] = EncodeJMPBUF32((int)((char*)stack+n-4));
+  //p->c.buf[0].__jmpbuf[5] = EncodeJMPBUF32((int)context_stub);
+  //p->c.buf[0].__jmpbuf[4] = EncodeJMPBUF32((int)((char*)stack+n-4));
 
 
   //printf("pointer 1 0x%016x pointer 2 0x%016x\n", ((unsigned int)context_stub), (unsigned int)((char*)stack + n - 4));
@@ -584,8 +589,8 @@ To fix this undef and redefine _FORTIFY_SOURCE to get things working again.*/
 
   printf("x86_64\n");
 
-  #define INIT_SP(p) ((char *)stack + n - 4);
-  #define CURR_SP(p) p->c.buf[0].__jmpbuf[4];
+  #define INIT_SP(p) ((char *)stack + n - 4)
+  #define CURR_SP(p) p->c.buf[0].__jmpbuf[4]
 
   p->c.buf[0].__jmpbuf[7] = (long long)context_stub;
   p->c.buf[0].__jmpbuf[6] = (long long)((char *)stack + n - 4);

@@ -204,9 +204,11 @@ void simulate (void (*f)(void)){
 	/*assert(!process == NULL);*/
 	assert(process);
 
+	printf("but I do get here\n");
+
 	context_switch (process);
 
-	printf("never hear\n");
+	printf("never here\n");
 	context_cleanup ();
 
 	if (cleanup_stuff)
