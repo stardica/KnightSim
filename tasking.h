@@ -5,7 +5,6 @@
 
 #define TASKING_MAGIC_NUMBER 0x5a5a5a5a
 
-
 #ifdef TIME_64
 typedef unsigned long long Time_t;
 #else
@@ -53,6 +52,7 @@ void end_tasking(void);
 void epause(count_t);			/* wait argument time units */
 void advance(eventcount *);			/* increment eventcount */
 void await(eventcount *, count_t);  /* wait for event >= arg */
+
 
 //task manipulation functions
 count_t get_time (void);

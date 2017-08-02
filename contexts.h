@@ -54,6 +54,7 @@ struct process_record {
  * for the currently executing thread of control.
  */
 extern process_t *current_process;
+
 extern process_t *terminated_process;
 
 
