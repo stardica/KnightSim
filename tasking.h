@@ -1,7 +1,6 @@
 #ifndef __TASKING_H__
 #define __TASKING_H__
 
-//#include <setjmp.h>
 #include "contexts.h"
 
 #define TASKING_MAGIC_NUMBER 0x5a5a5a5a
@@ -13,7 +12,9 @@ typedef unsigned long long Time_t;
 typedef long long Time_t;
 #endif
 
+
 typedef Time_t count_t;
+
 
 typedef struct task_s {
 	struct task_s *tasklist;	/* pointer to next task on the same list */
@@ -41,12 +42,6 @@ struct eventcount_s {
 };
 
 extern eventcount etime;	/* time counter */
-
-
-
-int setjmp64_2(jmp_buf __env);
-void longjmp64_2(jmp_buf __env, int val);
-
 
 
 //DESim application interface

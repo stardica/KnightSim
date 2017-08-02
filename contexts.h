@@ -23,6 +23,7 @@ typedef __jmp_buf jmp_buf;
 
 jmp_buf main_context;
 
+
 typedef struct process_record process_t;
 
 
@@ -34,6 +35,7 @@ typedef struct process_record process_t;
  * so that we can handle termination/invocation in a clean manner.
  *
  */
+
 typedef struct{
   jmp_buf buf;			/*state */
   char *stack;			/*stack */
