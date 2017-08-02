@@ -1,8 +1,10 @@
 
+
 #include <stdio.h>
 #include <signal.h>
 #include <sys/time.h>
 #include "contexts.h"
+
 
 /* current process and terminated process */
 process_t *current_process = NULL;
@@ -110,8 +112,22 @@ void context_init (process_t *p, void (*f)(void)){
   #define INIT_SP(p) (int)((char*)(p)->c.stack + (p)->c.sz)
   #define CURR_SP(p) ((p)->c.buf[0].__jmpbuf[4])
 
-  p->c.buf[0].__jmpbuf[5] = ((int)context_stub);
-  p->c.buf[0].__jmpbuf[4] = ((int)((char*)stack+n-4));
+  //p->c.buf[0].__jmpbuf[5] = ((int)context_stub);
+  //p->c.buf[0].__jmpbuf[4] = ((int)((char*)stack+n-4));
+  p->c.buf[5] = ((int)context_stub);
+  p->c.buf[4] = ((int)((char*)stack+n-4));
+}
+
+void end_tasking(void){
+
+	longjmp32_2(main_context, 1);
+	return;
+}
+
+
+int simulate_end(void){
+
+	return setjmp32_2(main_context);
 }
 
 
@@ -158,7 +174,6 @@ void context_switch (process_t *p){
 	if (!current_process || !setjmp64_2(current_process->c.buf))
   {
 	  current_process = p;
-	  //_longjmp(p->c.buf,1);
 	  longjmp64_2(p->c.buf, 1);
   }
 
@@ -190,9 +205,24 @@ void context_init (process_t *p, void (*f)(void)){
   #define INIT_SP(p) ((char *)stack + n - 4)
   #define CURR_SP(p) p->c.buf[0].__jmpbuf[4]
 
-  p->c.buf[0].__jmpbuf[7] = (long long)context_stub;
-  p->c.buf[0].__jmpbuf[6] = (long long)((char *)stack + n - 4);
+  //p->c.buf[0].__jmpbuf[7] = (long long)context_stub;
+  //p->c.buf[0].__jmpbuf[6] = (long long)((char *)stack + n - 4);
+  p->c.buf[7] = (long long)context_stub;
+  p->c.buf[6] = (long long)((char *)stack + n - 4);
 
+}
+
+void end_tasking(void){
+
+	longjmp64_2(main_context, 1);
+
+	return;
+}
+
+
+int simulate_end(void){
+
+	return setjmp64_2(main_context);
 }
 
 #else

@@ -3,29 +3,26 @@
 
 
 #include <stdlib.h>
-#include <setjmp.h>
 #include <sys/time.h>
 #include <stdio.h>
 
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 32768
-#else
-#define LARGE_STACK_SIZE 65536
 #endif
 
+# if __WORDSIZE == 64
+typedef long int __jmp_buf[8];
+# elif defined  __x86_64__
+__extension__ typedef long long int __jmp_buf[8];
+# else
+typedef int __jmp_buf[6];
+# endif
 
-/*
- * A process record. The first field of a process record must be
- * a context.
- *
- * The user must provide:
- *
- *       struct process_record {
- *             context_t c;        // The c.stack field must be initialized
- *             ...
- *       };
- *
- */
+typedef __jmp_buf jmp_buf;
+
+
+jmp_buf main_context;
+
 typedef struct process_record process_t;
 
 
@@ -37,12 +34,12 @@ typedef struct process_record process_t;
  * so that we can handle termination/invocation in a clean manner.
  *
  */
-typedef struct {
+typedef struct{
   jmp_buf buf;			/*state */
   char *stack;			/*stack */
   int sz;				/*stack size*/
   void (*start) ();		/*entry point*/
-} context_t;
+}context_t;
 
 
 struct process_record {
@@ -60,7 +57,6 @@ extern process_t *terminated_process;
 
 /*
  * The following routine returns the next process to be executed.
- *
  * (Provided by user)
  */
 extern process_t *context_select (void);
@@ -73,10 +69,8 @@ extern process_t *context_select (void);
 extern void context_switch (process_t *);
 
 /*
- *
  *  Call once before terminating computation. It must be called with
  *  interrupts disabled.
- *
  */
 extern void context_cleanup (void);
 

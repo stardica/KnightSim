@@ -20,8 +20,6 @@ task *curtask = &inittask;
 
 static task *hint = (task *) NULL;
 
-task *wakeup_task;
-
 eventcount etime = {
 		NULL,	/* tasklist */
 		NULL,	/* name */
@@ -202,21 +200,6 @@ void switch_context (eventcount *ec, count_t value){
 	return;
 }
 
-void end_tasking(void){
-
-	longjmp64_2(main_context, 1);
-
-	return;
-}
-
-
-int simulate_end(void){
-
-	return setjmp64_2(main_context);
-}
-
-
-
 
 /* await(ec, value) -- suspend until ec.c >= value. */
 void await (eventcount *ec, count_t value){
@@ -391,9 +374,6 @@ task * create_task(void (*func)(void), unsigned stacksize, char *name){
 	// for stack overflow check
 	tptr->magic = STK_OVFL_MAGIC;
 
-	//debug
-	//printf("In create_task1, name = %s, func address %#010x\n", tptr->name, &tptr->f);
-
 	return tptr;
 }
 
@@ -412,18 +392,11 @@ void remove_last_task (task *t){
 void set_id(unsigned id) {
 
 	curtask->id = (int)id;
-
 	return;
 }
 
 
 unsigned get_id(void){
-
-	// FlashLite-specific thingy here
-	if (curtask->id == -1)
-	{
-		return 0;
-	}
 
 	return (unsigned)(curtask->id);
 }
@@ -432,11 +405,9 @@ unsigned get_id(void){
 char *get_task_name (void){
 
 	return curtask->name ? curtask->name : (char*)"-unknown-";
-
 }
 
 count_t get_time (void){
 
 	return etime.count;
-
 }

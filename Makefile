@@ -9,12 +9,12 @@ CC = gcc
 
 all: DESim64 DESim32
 
-DESim64: tasking64.o wakeupcall64.o contexts64.o setjmp64.o longjmp64.o
-		ar -r $(LIB_NAME_64) tasking64.o wakeupcall64.o contexts64.o setjmp64.o longjmp64.o
+DESim64: tasking64.o contexts64.o setjmp64.o longjmp64.o
+		ar -r $(LIB_NAME_64) tasking64.o contexts64.o setjmp64.o longjmp64.o
 		@echo "Built $@ successfully"
 		
-DESim32: tasking32.o wakeupcall32.o contexts32.o setjmp32.o longjmp32.o
-		ar -r $(LIB_NAME_32) tasking32.o wakeupcall32.o contexts32.o setjmp32.o longjmp32.o
+DESim32: tasking32.o contexts32.o setjmp32.o longjmp32.o
+		ar -r $(LIB_NAME_32) tasking32.o contexts32.o setjmp32.o longjmp32.o
 		@echo "Built $@ successfully"
 
 
@@ -23,9 +23,6 @@ DESim32: tasking32.o wakeupcall32.o contexts32.o setjmp32.o longjmp32.o
 tasking64.o: 
 	$(CC) $(CC_FLAGS_64) tasking.c -c -o tasking64.o
 	
-wakeupcall64.o:
-	$(CC) $(CC_FLAGS_64) wakeupcall.c -c -o wakeupcall64.o 
-
 contexts64.o:
 	$(CC) $(CC_FLAGS_64) contexts.c -c -o contexts64.o
 	
@@ -41,8 +38,6 @@ longjmp64.o: longjmp64.s
 tasking32.o: 
 	$(CC) $(CC_FLAGS_32) tasking.c -c -o tasking32.o 
 	
-wakeupcall32.o:
-	$(CC) $(CC_FLAGS_32) wakeupcall.c -c -o wakeupcall32.o 
 
 contexts32.o:
 	$(CC) $(CC_FLAGS_32) contexts.c -c -o contexts32.o
