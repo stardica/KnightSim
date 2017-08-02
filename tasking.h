@@ -83,14 +83,16 @@ jmp_buf main_context;
 
 typedef volatile count_t ticket_t;
 
+int setjmp64_2(jmp_buf __env);
+void longjmp64_2(jmp_buf __env, int val);
+
 
 void epause(count_t);			/* wait argument time units */
 
 void await(eventcount *, count_t);    	/* wait for event >= arg */
 
-void end_tasking();
+void end_tasking(void);
 
-count_t ticket(ticket_t *);	 	        /* atomically inc counter */
 
 void advance(eventcount *);			/* increment eventcount */
 void future_advance(eventcount *, count_t);
@@ -117,7 +119,8 @@ void set_id(unsigned id);
 /* if you need to wait, call await_wait */
 #define await_wait(ec,cnt)  switch_context(ec,cnt)
 
-void simulate (void (*cleanup)(void));
+void simulate (void);
+int simulate_end(void);
 void task_write (FILE *fp, task *t, int ctxt); /* ctxt = 1 if save ctxt */
 void task_read  (FILE *fp, task *t, int ctxt); /* 0 otherwise */
 void count_write (FILE *fp, count_t c);

@@ -1,36 +1,3 @@
-/*
- * Copyright 1988 MIPS Computer Systems Inc.  All Rights Reserved.
- *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted, provided
- * that the above copyright notice appear in all copies and that both that
- * copyright notice and this permission notice appear in supporting
- * documentation, and that the name of MIPS not be used in advertising or
- * publicity pertaining to distribution of the software without specific,
- * written prior permission.  MIPS makes no representations about the
- * suitability of this software for any purpose.  It is provided "as is"
- * without express or implied warranty or support of any kind.
- */
-
-/* tasking.s, Earl Killian, October 1987. */
-
-/* modified to permit stack size checking, Todd Mowry, March 1990. */
-
-/* split tasking.s into tasking.c and switch.s, only state-saving routines
- * kept in assembly, Jim Laudon, January 1994. */
-
-/* tasking.c, C version of tasking.s routines, Jim Laudon, January 1994. */
-
-/* Modified create_task() so that new tasks can take an argument, 
- * Mark Heinrich and David Ofelt, 1995 */
-
-/* Added a thread ID to the threads which can sometimes be useful, Mark
-   Heinrich, 1996 */
-
-/* Rewritten to eliminate all .s files, ported to context library, 
-   Rajit Manohar, 1999 */
-
-
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,8 +21,6 @@ task *curtask = &inittask;
 static task *hint = (task *) NULL;
 
 task *wakeup_task;
-
-//extern FILE *logF;
 
 eventcount etime = {
 		NULL,	/* tasklist */
@@ -161,10 +126,6 @@ count_t last_value = 0;	   /* more stuff like that */
 
 process_t *context_select(void){
 
-	#if 0
-	assert ( !(!!(curtask->name == end_of_concurrency))^(!!(current_process == NULL)) );
-	#endif
-
 	if (last_ec)
 	{
 		find_next_task (last_ec, last_value);
@@ -195,18 +156,16 @@ process_t *context_select(void){
 		etime.count = curtask->count;
 	}
 
-
-
 	return (process_t*)&(curtask->c);
 }
 
 
 
-void simulate (void (*f)(void)){
+void simulate (void){
 
 	printf("simulate called\n");
 
-	cleanup_stuff = f;
+	cleanup_stuff = end_tasking;
 	inittask.name = end_of_concurrency;
 	process_t * process;
 
@@ -214,27 +173,15 @@ void simulate (void (*f)(void)){
 	/*assert(!process == NULL);*/
 	assert(process);
 
-	printf("but I do get here\n");
-
 	context_switch (process);
 
-	printf("never here\n");
-	context_cleanup ();
+	context_cleanup();
 
 	if (cleanup_stuff)
 	{
 		(*cleanup_stuff) ();
 		exit (0);
 	}
-
-	return;
-}
-
-void context_timeout (void){
-
-	/* should never be called */
-	printf ("CONTEXT_TIMEOUT! This should not happen\n");
-	context_switch (context_select ());
 
 	return;
 }
@@ -255,45 +202,38 @@ void switch_context (eventcount *ec, count_t value){
 	return;
 }
 
-void end_tasking(){
+void end_tasking(void){
 
 	longjmp64_2(main_context, 1);
 
 	return;
 }
 
+
+int simulate_end(void){
+
+	return setjmp64_2(main_context);
+}
+
+
+
+
 /* await(ec, value) -- suspend until ec.c >= value. */
 void await (eventcount *ec, count_t value){
 
-
-	//int bogus; /* just for grabbing something close to current sp... */
+	/*todo*/
+	/*check for stack overflows*/
 
 	// if stack overflowed before call to await, it will most likely have
 	// thrashed magic.
 	/*assert(curtask->magic == STK_OVFL_MAGIC);*/
 
-	//fprintf(logF, "%s in await\n", curtask->name);
-
 	if (ec->count >= value)
 		return;
 
-
-	//fprintf(logF, "%s awaiting until count is %llu\n", curtask->name, value);
-
-	//Check for stack overflow
-
-	/*assert(((unsigned)curtask + sizeof(task) < (unsigned) &bogus));*/
-
 	switch_context(ec, value);
 
-
 	return;
-}
-
-/* ticket(sequencer) -- return next ticket. */
-count_t ticket (ticket_t *tkt){
-
-	return (*tkt)++;
 }
 
 /* advance(ec) -- increment an event count. */
@@ -346,10 +286,6 @@ void initialize_event_count (eventcount * ec, count_t count, char *ecname){
     }
 
     ectail = ec;
-
-    //debug
-   	//printf("event count created, name = %s, count = %d\n", ec->name, ec->count);
-
 
     return;
 }
@@ -418,23 +354,11 @@ void delete_event_count (eventcount *ec){
 	}
 }
 
-/* frees up space with current task, and then selects next
-   task to run and sets curtask to point to it */
-void finish_task (void){
-
-	free ((void*)curtask);
-
-	/* get next task to run */
-	last_ec = NULL;
-
-	return;
-}
 
 void context_destroy (process_t *p){
 
+	/* free stack space */
 	free (((context_t*)p)->stack);
-  /* free stack space */
-
 }
 
 /* create_task(task, stacksize) -- create a task with specified stack size. */
@@ -474,46 +398,6 @@ task * create_task(void (*func)(void), unsigned stacksize, char *name){
 }
 
 
-static void stub_function (void)
-{
-  assert (&curtask->c == (context_t *)current_process);
-
-  (*curtask->f)(curtask->arg2);
-}
-
-
-task * create_task2(void (*func)(void *), void *arg, unsigned stacksize, char *name){
-
-	char*     ptr;
-	task*     tptr;
-	unsigned  size = sizeof(task);
-
-	/* stacksize should be multiple of unsigned size */
-	assert ((stacksize % sizeof(unsigned)) == 0);
-
-	ptr = (char *) malloc(size);
-	assert(ptr != NULL);
-
-	tptr = (task *) ptr;
-	tptr->count = etime.count;
-	tptr->name = name;
-	tptr->arg2 = arg;
-	tptr->f = func;
-	tptr->c.stack = (char *)malloc(stacksize);
-   	tptr->c.sz = stacksize;
-
-	context_init ((process_t*)&tptr->c, stub_function); /* this is wrong */
-
-	/* link into tasklist */
-	tptr->tasklist = etime.tasklist;
-	etime.tasklist = tptr;
-
-	// for stack overflow check
-	tptr->magic = STK_OVFL_MAGIC;
-  
-	return tptr;
-}
-
 // delete last inserted task
 void remove_last_task (task *t){
 
@@ -524,13 +408,6 @@ void remove_last_task (task *t){
 	return;
 }
 
-
-void initialize_this_task(void){
-
-	curtask = &inittask;
-
-	return;
-}
 
 void set_id(unsigned id) {
 
@@ -562,46 +439,4 @@ count_t get_time (void){
 
 	return etime.count;
 
-}
-
-/*void task_write (FILE *fp, task *t, int ctxt){
-
-	if (ctxt)
-		context_write(fp, (process_t*)&t->c);
-
-	count_write (fp, t->count);
-
-	return;
-}
-
-void task_read (FILE *fp, task *t, int ctxt){
-
-	if (ctxt)
-		context_read(fp, (process_t*)&t->c);
-
-	count_read (fp, &t->count);
-
-	return;
-}*/
-
-void count_write (FILE *fp, count_t c){
-
-	unsigned long x;
-
-	x = (unsigned long)c;
-  
-	fprintf (fp, "%lu\n", x);
-
-	return;
-}
-
-void count_read (FILE *fp, count_t *c){
-
-	unsigned long x;
-
-	fscanf(fp, "%lu", &x);
-
-	*c = x;
-
-	return;
 }

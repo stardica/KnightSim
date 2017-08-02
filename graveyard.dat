@@ -1,3 +1,66 @@
+ /* printf("--------------\n");
+  printf("buff 0 %ld\n", p->c.buf[0].__jmpbuf[0]);
+  printf("buff 1 %ld\n", p->c.buf[0].__jmpbuf[1]);
+  printf("buff 2 %ld\n", p->c.buf[0].__jmpbuf[2]);
+  printf("buff 3 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[3]);
+  printf("buff 4 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[4]);
+  printf("buff 5 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[5]);
+  printf("buff 6 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[6]);
+  printf("buff 7 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[7]);
+
+  //DecodeJMPBUF64()''
+  //printf("esp 0x%08x\n", p->c.buf[0].__jmpbuf[4]);
+  //printf("eip 0x%08x\n", p->c.buf[0].__jmpbuf[5]);
+  printf("--------------\n");*/
+
+   /*return_here:
+  if(!setjmp32(p->c.buf, (unsigned int)&&return_here + 23))
+  {
+
+	  //printf("rethere 0x%08x\n", &&return_here + 5);
+	 // printf("rethere 0x%08x\n", &&printf("rethere 0x%08x\n", &&return_here + 5););
+
+	  printf("from setjmp\n");
+
+	  getchar();
+  }
+  else
+  {
+	  printf("from longjmp\n");
+  }*/
+
+ /* printf("ebx %d\n", p->c.buf[0].__jmpbuf[0]);
+  printf("esi %d\n", p->c.buf[0].__jmpbuf[1]);
+  printf("edi %d\n", p->c.buf[0].__jmpbuf[2]);
+  printf("ebp 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[3]);
+  printf("esp 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[4]);
+  printf("eip 0x%08x\n", (unsigned int) p->c.buf[0].__jmpbuf[5]);*/
+
+  /*printf("decode.0 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[0]));
+  printf("decode.1 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[1]));
+  printf("decode.2 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[2]));
+  printf("decode.3 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[3]));
+  printf("decode.4 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[4]));
+  printf("decode.5 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[5]));
+  printf("decode.6 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[6]));
+  printf("decode.7 0x%016x\n", (unsigned int) (p->c.buf[0].__jmpbuf[7]));
+
+  printf("decode.0 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[0]));
+  printf("decode.1 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[1]));
+  printf("decode.2 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[2]));
+  printf("decode.3 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[3]));
+  printf("decode.4 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[4]));
+  printf("decode.5 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[5]));
+  printf("decode.6 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[6]));
+  printf("decode.7 0x%016x\n", DecodeJMPBUF64(p->c.buf[0].__jmpbuf[7]));*/
+
+  //getchar();
+
+
+
+
+
+
 //printf("pointer 1 0x%016x pointer 2 0x%016x\n", ((unsigned int)context_stub), (unsigned int)((char*)stack + n - 4));
   //printf("pointer 1 0x%016x pointer 2 0x%016x\n", EncodeJMPBUF64((unsigned int)context_stub), EncodeJMPBUF64((unsigned int)((char*)stack + n - 4)));
   
