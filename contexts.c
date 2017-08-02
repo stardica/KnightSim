@@ -30,8 +30,6 @@ struct process_record {
 process_t *current_process = NULL;
 static process_t *terminated_process = NULL;
 
-#define ENCODE_JMPBUF(j) j
-
 #ifdef FAIR
 
 static struct itimerval mt;	/* the timer for the main thread */

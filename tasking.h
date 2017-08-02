@@ -79,12 +79,16 @@ struct eventcount_s {
 
 extern eventcount etime;	/* time counter */
 
+jmp_buf main_context;
+
 typedef volatile count_t ticket_t;
 
 
 void epause(count_t);			/* wait argument time units */
 
 void await(eventcount *, count_t);    	/* wait for event >= arg */
+
+void end_tasking();
 
 count_t ticket(ticket_t *);	 	        /* atomically inc counter */
 

@@ -159,7 +159,7 @@ eventcount *last_ec = NULL; /* to work with context library */
 
 count_t last_value = 0;	   /* more stuff like that */
 
-process_t *context_select (void){
+process_t *context_select(void){
 
 	#if 0
 	assert ( !(!!(curtask->name == end_of_concurrency))^(!!(current_process == NULL)) );
@@ -181,20 +181,30 @@ process_t *context_select (void){
 
 		if (curtask == NULL)
 		{
-			//context_cleanup ();
+			//context_cleanup();
+
+			printf("exiting after switch\n");
+
+			assert(cleanup_stuff);
+
 			if (cleanup_stuff)
-				(*cleanup_stuff) ();
-			exit (0);
+				(*cleanup_stuff)();
 		}
 
 		etime.tasklist = curtask->tasklist;
 		etime.count = curtask->count;
 	}
 
+
+
 	return (process_t*)&(curtask->c);
 }
 
+
+
 void simulate (void (*f)(void)){
+
+	printf("simulate called\n");
 
 	cleanup_stuff = f;
 	inittask.name = end_of_concurrency;
@@ -231,26 +241,23 @@ void context_timeout (void){
 
 void switch_context (eventcount *ec, count_t value){
 
-	process_t *p;
+	process_t *p = NULL;
 	last_ec = ec;
 	last_value = value;
 
+	p = context_select();
 
-	//debug
-	//printf("in switch_context\n");
-	//fflush(stdout);
+	if (p)
+	{
+		context_switch(p);
+	}
 
-	//fprintf (logF, ">>>>>>>> out: %s\n", get_tname());
+	return;
+}
 
-	p = context_select ();
+void end_tasking(){
 
-	//debug
-	//printf("after context_select\n");
-	//fflush(stdout);
-
-	if (p) context_switch (p);
-	//fprintf (logF, ">>>>>>>> in: %s\n", get_tname());
-
+	longjmp64_2(main_context, 1);
 
 	return;
 }
