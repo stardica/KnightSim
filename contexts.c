@@ -1,14 +1,11 @@
 
 
-#include <stdio.h>
-#include <signal.h>
-#include <sys/time.h>
 #include "contexts.h"
 
 
 /* current process and terminated process */
-process_t *current_process = NULL;
-process_t *terminated_process = NULL;
+process *current_process = NULL;
+process *terminated_process = NULL;
 
 
 void context_cleanup (void){
@@ -18,8 +15,8 @@ void context_cleanup (void){
     context_destroy (terminated_process);
     terminated_process = NULL;
   }
-
 }
+
 
 static void context_stub (void){
 
@@ -46,41 +43,6 @@ void context_exit (void){
 }
 
 #if defined(__linux__) && defined(__i386__)
-
-int setjmp32_2(jmp_buf __env);
-void longjmp32_2(jmp_buf __env, int val);
-
-int DecodeJMPBUF32(int j){
-
-    int retVal;
-
-    asm (	"mov %1,%%edx; "
- 		    "ror $0x9,%%edx; "
- 		    "xor %%gs:0x18,%%edx; "
- 		    "mov %%edx,%0;"
-       :"=r" (retVal)  /* output */
-       :"r" (j)        /* input */
-       :"%edx"         /* clobbered register */
-    );
-
-    return retVal;
-}
-
-int EncodeJMPBUF32(int j){
-
-    int retVal;
-
-    asm ("mov %1,%%edx; "
- 		   "xor %%gs:0x18,%%edx; "
- 		   "rol $0x9,%%edx; "
- 		   "mov %%edx,%0;"
-       :"=r" (retVal)  /* output */
-       :"r" (j)        /* input */
-       :"%edx"         /* clobbered register */
-    );
-
-    return retVal;
-}
 
 void context_switch (process_t *p)
 {
@@ -118,57 +80,13 @@ void context_init (process_t *p, void (*f)(void)){
   p->c.buf[4] = ((int)((char*)stack+n-4));
 }
 
-void end_tasking(void){
-
-	longjmp32_2(main_context, 1);
-	return;
-}
 
 
-int simulate_end(void){
-
-	return setjmp32_2(main_context);
-}
 
 
 #elif defined(__linux__) && defined(__x86_64)
 
-int setjmp64_2(jmp_buf __env);
-void longjmp64_2(jmp_buf __env, int val);
-
-long long DecodeJMPBUF64(long long j){
-
-      long long retVal;
-
-      asm volatile ("mov %1, %%rax;"
-   		    "ror $0x11, %%rax;"
-   		    "xor %%fs:0x30, %%rax;"
-   		    "mov %%rax, %0;"
-         :"=r" (retVal)   /*output*/
-         :"r" (j)         /*input*/
-         :"%rax"          /*clobbered register*/
-      );
-
-      return retVal;
-}
-
-long long EncodeJMPBUF64(long long j) {
-
-   long long retVal;
-
-   	asm (	"mov %1, %%rax;"
-   			"xor %%fs:0x30, %%rax;"
-   			"rol $0x11, %%rax;"
-   			"mov %%rax, %0;"
-   			:"=r" (retVal)   /*output*/
-   			:"r" (j)         /*input*/
-   			:"%rax"          /*clobbered register*/
-   		);
-
-   	return retVal;
-}
-
-void context_switch (process_t *p){
+void context_switch (process *p){
 
 
 	if (!current_process || !setjmp64_2(current_process->c.buf))
@@ -191,7 +109,7 @@ void context_switch (process_t *p){
  * Non-portable code is in this function
  */
 
-void context_init (process_t *p, void (*f)(void)){
+void context_init (process *p, void (*f)(void)){
 
   void *stack;
   int n;
@@ -210,19 +128,6 @@ void context_init (process_t *p, void (*f)(void)){
   p->c.buf[7] = (long long)context_stub;
   p->c.buf[6] = (long long)((char *)stack + n - 4);
 
-}
-
-void end_tasking(void){
-
-	longjmp64_2(main_context, 1);
-
-	return;
-}
-
-
-int simulate_end(void){
-
-	return setjmp64_2(main_context);
 }
 
 #else

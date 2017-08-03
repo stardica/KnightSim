@@ -3,31 +3,31 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "contexts.h"
 #include "tasking.h"
-
-typedef char boolean;
-
-#define STK_OVFL_MAGIC 0x12349876 /* stack overflow check */
+#include "eventcount.h"
+#include "contexts.h"
 
 static char *end_of_concurrency = "--this-should-never-happen--";
 
 static void (*cleanup_stuff) (void) = NULL;
 
-static task inittask = { NULL, NULL, 0, NULL, NULL, NULL, -1, STK_OVFL_MAGIC, };
-
+task inittask;
 task *curtask = &inittask;
+task *hint = NULL;
 
-static task *hint = (task *) NULL;
+void initial_task_init(void){
 
-eventcount etime = {
-		NULL,	/* tasklist */
-		NULL,	/* name */
-		0,		/* count */
-		NULL	/* eclist */
-};
+	inittask.tasklist = NULL;
+	inittask.name = NULL;
+	inittask.count = 0;
+	inittask.cdata2 = NULL;
+	inittask.arg2 = NULL;
+	inittask.f = NULL;
+	inittask.id = -1;
+	inittask.magic = STK_OVFL_MAGIC;
 
-static eventcount *ectail = NULL;
+	return;
+}
 
 /* epause(N) -- wait N cycles.  Equivalent to await(etime, etime.c+N) */
 void epause (count_t count){
@@ -118,11 +118,7 @@ static inline void find_next_task (eventcount *ec, count_t value){
   	return;
 }
 
-eventcount *last_ec = NULL; /* to work with context library */
-
-count_t last_value = 0;	   /* more stuff like that */
-
-process_t *context_select(void){
+process *context_select(void){
 
 	if (last_ec)
 	{
@@ -154,39 +150,12 @@ process_t *context_select(void){
 		etime.count = curtask->count;
 	}
 
-	return (process_t*)&(curtask->c);
-}
-
-
-
-void simulate (void){
-
-	printf("simulate called\n");
-
-	cleanup_stuff = end_tasking;
-	inittask.name = end_of_concurrency;
-	process_t * process;
-
-	process = context_select();
-	/*assert(!process == NULL);*/
-	assert(process);
-
-	context_switch (process);
-
-	context_cleanup();
-
-	if (cleanup_stuff)
-	{
-		(*cleanup_stuff) ();
-		exit (0);
-	}
-
-	return;
+	return (process*)&(curtask->c);
 }
 
 void switch_context (eventcount *ec, count_t value){
 
-	process_t *p = NULL;
+	process *p = NULL;
 	last_ec = ec;
 	last_value = value;
 
@@ -196,6 +165,7 @@ void switch_context (eventcount *ec, count_t value){
 	{
 		context_switch(p);
 	}
+
 
 	return;
 }
@@ -219,134 +189,44 @@ void await (eventcount *ec, count_t value){
 	return;
 }
 
-/* advance(ec) -- increment an event count. */
-/* Don't use on time event count! */
-void advance (eventcount *ec){
 
-	task *ptr, *pptr;
+void simulate (void){
 
-	/* advance count */
-	ec->count++;
+	printf("simulate called\n");
 
-	/* check for no tasks being enabled */
-	ptr = ec->tasklist;
+	cleanup_stuff = end_simulate;
+	inittask.name = end_of_concurrency;
+	process * process;
 
-	if ((ptr == NULL) || (ptr->count > ec->count))
-		return;
+	process = context_select();
+	/*assert(!process == NULL);*/
+	assert(process);
 
-	/* advance down task list */
-	do
+	context_switch (process);
+
+	context_cleanup();
+
+	if (cleanup_stuff)
 	{
-		/* set tasks time equal to current time */
-		ptr->count = etime.count;
-		pptr = ptr;
-		ptr = ptr->tasklist;
-	} while (ptr && (ptr->count == ec->count));
+		(*cleanup_stuff) ();
+		exit (0);
+	}
 
-	/* add list of events to etime */
-	pptr->tasklist = etime.tasklist;
-	etime.tasklist = ec->tasklist;
-	ec->tasklist = ptr;
-  
 	return;
 }
 
-void initialize_event_count (eventcount * ec, count_t count, char *ecname){
-
-	ec->tasklist = NULL;
-	ec->count    = count;
-	ec->name     = ecname;
-	ec->eclist   = NULL;
 
 
-    if (ectail == NULL)
-    {
-       etime.eclist = ec;
-    } 
-    else
-    {
-       ectail->eclist = ec;
-    }
 
-    ectail = ec;
-
-    return;
-}
-
-eventcount *new_eventcount (char *name){
-
-	eventcount *ec;
-
-	ec = (eventcount *)malloc (sizeof(eventcount));
-	if (!ec)
-	{
-		fprintf (stderr, "Malloc failed, in new_eventcount()\n");
-		exit (1);
-	}
-
-	initialize_event_count (ec, 0, name);
-
-	return ec;
-}
-
-void delete_event_count (eventcount *ec){
-
-	eventcount	*front;
-	eventcount	*back;
-	unsigned	found = 0;
-
-	assert(ec != NULL);
-
-	// --- This function should unlink the eventcount from the etime eclist ---
-	assert(etime.eclist != NULL);
-
-	front = etime.eclist;
-	if (ec == front)
-	{
-		etime.eclist = ec->eclist;
-		free ((void*)ec);
-		if (ectail == ec)
-		{
-			ectail = NULL;
-		}
-	}
-	else
-	{
-	   back = etime.eclist;
-	   front = front->eclist;
-	   while ((front != NULL) && (!found))
-	   {
-		   if (ec == front)
-		   {
-			   back->eclist = ec->eclist;
-			   free ((void*)ec);
-			   found = 1;
-		   }
-		   else
-		   {
-			   back = back->eclist;
-			   front = front->eclist;
-		   }
-	   }
-
-	   assert(found == 1);
-	   if (ectail == ec)
-	   {
-		   ectail = back;
-	   }
-	}
-}
-
-
-void context_destroy (process_t *p){
+void context_destroy (process *p){
 
 	/* free stack space */
-	free (((context_t*)p)->stack);
+	free (((context*)p)->stack);
 }
 
 /* create_task(task, stacksize) -- create a task with specified stack size. */
 /* task is code pointer and closure pointer */
-task * create_task(void (*func)(void), unsigned stacksize, char *name){
+task * task_create(void (*func)(void), unsigned stacksize, char *name){
 
 	char*     ptr;
 	task*     tptr;
@@ -365,7 +245,7 @@ task * create_task(void (*func)(void), unsigned stacksize, char *name){
 	assert(tptr->c.stack = (char *)malloc(stacksize));
 	tptr->c.sz = stacksize;
 
-	context_init ((process_t*)&tptr->c, func);
+	context_init ((process*)&tptr->c, func);
 
 	/* link into task list */
 	tptr->tasklist = etime.tasklist;
@@ -389,16 +269,16 @@ void remove_last_task (task *t){
 }
 
 
-void set_id(unsigned id) {
+void set_id(int id){
 
-	curtask->id = (int)id;
+	curtask->id = id;
 	return;
 }
 
 
-unsigned get_id(void){
+int get_id(void){
 
-	return (unsigned)(curtask->id);
+	return curtask->id;
 }
 
 
@@ -406,6 +286,7 @@ char *get_task_name (void){
 
 	return curtask->name ? curtask->name : (char*)"-unknown-";
 }
+
 
 count_t get_time (void){
 
