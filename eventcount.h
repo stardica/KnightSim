@@ -5,12 +5,13 @@
 #include "desim.h"
 
 struct eventcount_s {
-	char * name;		/* string name of eventcount */
+	char * name;		/* string name of event count */
 	long long id;
 	task * tasklist;	/* list of tasks waiting on this event */
 	count_t count;		/* current value of event */
-	struct eventcount_s* eclist; /* pointer to next eventcount */
+	struct eventcount_s* eclist; /* pointer to next event count */
 };
+
 
 /* Global time counter */
 extern eventcount etime;

@@ -41,6 +41,7 @@ void epause (count_t count){
 	{
 		await(&etime, etime.count + count);
 	}
+
 	return;
 }
 
@@ -166,12 +167,12 @@ process *context_select(void){
 
 		/*go through the list newest to oldest
 		etime is now pointing back one element in the list*/
+
 		etime.tasklist = curtask->tasklist;
 		etime.count = curtask->count;
 
-
-		printf("curtask %s count %d\n", curtask->name, curtask->count);
-		printf("etime %s count %d\n", etime.tasklist->name, etime.tasklist->count);
+		printf("curtask %s count %llu\n", curtask->name, curtask->count);
+		printf("etime %s count %llu\n", etime.tasklist->name, etime.tasklist->count);
 
 	}
 

@@ -7,6 +7,8 @@
 
 #include "desim.h"
 #include "eventcount.h"
+#include "tasking.h"
+
 
 long long ecid = 0;
 count_t last_value = 0;
