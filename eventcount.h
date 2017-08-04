@@ -3,12 +3,15 @@
 #define __eventcount_H__
 
 #include "desim.h"
+#include "list.h"
 
 struct eventcount_s {
 	char * name;		/* string name of event count */
 	long long id;
-	task * tasklist;	/* list of tasks waiting on this event */
+	task *tasklist;	/* list of tasks waiting on this event */
+	list *tlist;
 	count_t count;		/* current value of event */
+
 	struct eventcount_s* eclist; /* pointer to next event count */
 };
 

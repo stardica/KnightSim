@@ -47,6 +47,7 @@ struct list_t
 	void **elem;  /* Vector of elements */
 };
 
+typedef struct list_t list;
 
 /** Iterate through all element of linked list.
  *

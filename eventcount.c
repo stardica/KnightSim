@@ -24,6 +24,7 @@ void etime_init(void){
 	etime.id = 0;
 	etime.count = 0;
 	etime.tasklist = NULL;
+	etime.tlist = list_create();
 	etime.eclist = NULL;
 
 	return;
@@ -52,7 +53,7 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->eclist = NULL;
 
 
-	//create singlly linked list
+	//create singly linked list
     if (ectail == NULL)
     {
     	//always points to first event count created.

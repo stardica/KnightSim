@@ -22,7 +22,9 @@ struct context_t{
 };
 
 struct task_s{
-	struct task_s *tasklist;	/* pointer to next task on the same list */
+	task *tasklist;	/* pointer to next task on the same list */
+	list *tlist;
+
 	char *name;			/* task name */
 	count_t count;		/* argument to await */
   

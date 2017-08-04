@@ -35,10 +35,18 @@ void epause (count_t count){
 	/* if no tasks or still first task, keep running */
 	if ((etime.tasklist == NULL) || ((etime.count + count) <= etime.tasklist->count))
 	{
+		printf("here %llu\n", etime.count);
+
 		etime.count += count;
+
+		printf("here %llu\n", etime.count);
+
 	}
 	else /* switch to next task */
 	{
+
+		printf("here\n");
+
 		await(&etime, etime.count + count);
 	}
 
