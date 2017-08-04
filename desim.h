@@ -9,8 +9,6 @@ typedef unsigned long long Time_t;
 typedef long long Time_t;
 #endif
 
-typedef Time_t count_t;
-
 # if __WORDSIZE == 64
 typedef long int __jmp_buf[8];
 # elif defined  __x86_64__
@@ -20,9 +18,6 @@ typedef int __jmp_buf[6];
 # endif
 
 typedef __jmp_buf jmp_buf;
-
-jmp_buf main_context;
-
 
 /*our assembly fucntions (.s) files these store
 and load CPU register values. For DESim
@@ -49,17 +44,17 @@ long long EncodeJMPBUF64(long long j);
 #error Unsupported machine/OS combination
 #endif
 
+typedef Time_t count_t;
 typedef struct eventcount_s eventcount;
-typedef struct task_s task;
 typedef struct context_t context;
+typedef struct task_s task;
 typedef struct process_record process;
 
 
 //id for eventcounts
+jmp_buf main_context;
 extern long long ecid;
-
 extern count_t last_value;
-
 
 
 void desim_init(void);

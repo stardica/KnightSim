@@ -49,19 +49,22 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->id = ecid++;
 	ec->tasklist = NULL;
 	ec->count = count;
-
 	ec->eclist = NULL;
 
 
+	//create singlly linked list
     if (ectail == NULL)
     {
-       etime.eclist = ec;
+    	//always points to first event count created.
+    	etime.eclist = ec;
     }
     else
     {
-       ectail->eclist = ec;
+    	//old tail!!
+    	ectail->eclist = ec;
     }
 
+    //move to new tail!
     ectail = ec;
 
     return;

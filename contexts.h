@@ -1,41 +1,12 @@
 #ifndef __CONTEXTS_H__
 #define __CONTEXTS_H__
 
-
 #include <stdlib.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <signal.h>
 
 #include "desim.h"
-
-
-struct context_t{
-  jmp_buf buf;			/*state */
-  char *stack;			/*stack */
-  int sz;				/*stack size*/
-  void (*start) ();		/*entry point*/
-};
-
-#include "eventcount.h"
-#include "tasking.h"
-
-
-
-
-
-
-#ifndef DEFAULT_STACK_SIZE
-#define DEFAULT_STACK_SIZE 32768
-#endif
-
-
-
-
-
-struct process_record {
-  context c;
-};
 
 /*
  * A context consists of the state of the process, which is the
@@ -68,6 +39,8 @@ extern process *context_select (void);
  * disabled. It re-enables interrupts.
  */
 extern void context_switch (process *p);
+
+extern void context_exit (void);
 
 /*
  *  Call once before terminating computation. It must be called with

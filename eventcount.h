@@ -2,7 +2,7 @@
 #ifndef __eventcount_H__
 #define __eventcount_H__
 
-#include "tasking.h"
+#include "desim.h"
 
 struct eventcount_s {
 	char * name;		/* string name of eventcount */
@@ -18,10 +18,9 @@ extern eventcount *ectail;
 extern eventcount *last_ec; /* to work with context library */
 
 void etime_init(void);
-
 eventcount *eventcount_create (char *name);
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
-void advance(eventcount *ec);			/* increment eventcount */
+void advance(eventcount *ec);
 void eventcount_destroy(eventcount *ec);
 
 #endif /*__eventcount_H__*/

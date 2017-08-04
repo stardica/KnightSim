@@ -16,6 +16,7 @@ void desim_init(void){
 
 	//init etime
 	etime_init();
+
 	initial_task_init();
 
 	return;
@@ -110,7 +111,6 @@ long long EncodeJMPBUF64(long long j) {
 void end_simulate(void){
 
 	longjmp64_2(main_context, 1);
-
 	return;
 }
 
@@ -119,6 +119,7 @@ int desim_end(void){
 
 	return setjmp64_2(main_context);
 }
+
 #else
 #error Unsupported machine/OS combination
 #endif

@@ -1,5 +1,8 @@
 
+#include <assert.h>
 
+#include "desim.h"
+#include "tasking.h"
 #include "contexts.h"
 
 
@@ -29,6 +32,11 @@ static void context_stub (void){
   }
 
   (*current_process->c.start)();
+
+  /*if current current process returns i.e. hits the bottom of its function
+  it will return here. Then we need to terminate the process*/
+
+  printf("exiting\n");
 
   terminated_process = current_process;
 
@@ -88,9 +96,13 @@ void context_init (process_t *p, void (*f)(void)){
 
 void context_switch (process *p){
 
-
+	//setjmp returns 1 if jumping to this position via longjmp
 	if (!current_process || !setjmp64_2(current_process->c.buf))
   {
+
+		/*first round takes us to context stub
+		subsequent rounds take us to an await or pause*/
+
 	  current_process = p;
 	  longjmp64_2(p->c.buf, 1);
   }
@@ -111,11 +123,13 @@ void context_switch (process *p){
 
 void context_init (process *p, void (*f)(void)){
 
-  void *stack;
+  void *stack = NULL;
   int n;
 
   p->c.start = f; /*assigns the head of a function*/
   stack = p->c.stack;
+  assert(stack);
+
   n = p->c.sz;
 
   setjmp64_2(p->c.buf);
