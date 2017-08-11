@@ -36,6 +36,8 @@ int EncodeJMPBUF32(int j);
 
 int setjmp64_2(jmp_buf __env);
 void longjmp64_2(jmp_buf __env, int val);
+long long encode64(long long val);
+long long decode64(long long val);
 
 long long DecodeJMPBUF64(long long j);
 long long EncodeJMPBUF64(long long j);

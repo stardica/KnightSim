@@ -10,12 +10,12 @@ CC = gcc
 
 all: DESim64 DESim32
 
-DESim64: desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o longjmp64.o
-		ar -r $(LIB_NAME_64) desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o longjmp64.o
+DESim64: desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o longjmp64.o decode64.o encode64.o
+		ar -r $(LIB_NAME_64) desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o longjmp64.o decode64.o encode64.o
 		@echo "Built $@ successfully"
 		
-DESim32: desim32.o eventcount32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
-		ar -r $(LIB_NAME_32) desim32.o eventcount32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
+DESim32: desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
+		ar -r $(LIB_NAME_32) desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
 		@echo "Built $@ successfully"
 
 
@@ -41,15 +41,25 @@ setjmp64.o: setjmp64.s
 
 longjmp64.o: longjmp64.s
 	$(CC) $(CC_FLAGS_64) longjmp64.s -c
+	
+decode64.o: decode64.s
+	$(CC) $(CC_FLAGS_64) decode64.s -c
+	
+encode64.o: encode64.s
+	$(CC) $(CC_FLAGS_64) encode64.s -c
+	
 
 
 
 #32 bit versions
 desim32.o:
-	$(CC) $(CC_FLAGS_64) desim.c -c -o desim32.o
+	$(CC) $(CC_FLAGS_32) desim.c -c -o desim32.o
 	
 eventcount32.o:
-	$(CC) $(CC_FLAGS_64) eventcount.c -c -o eventcount32.o
+	$(CC) $(CC_FLAGS_32) eventcount.c -c -o eventcount32.o
+	
+list32.o:
+	$(CC) $(CC_FLAGS_32) list.c -c -o list32.o
 
 tasking32.o: 
 	$(CC) $(CC_FLAGS_32) tasking.c -c -o tasking32.o 
@@ -62,6 +72,7 @@ setjmp32.o: setjmp32.s
 
 longjmp32.o: longjmp32.s
 	$(CC) $(CC_FLAGS_32) longjmp32.s -c
+	
 
 clean:
 	rm -f *.o *.a

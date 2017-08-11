@@ -35,17 +35,17 @@ void epause (count_t count){
 	/* if no tasks or still first task, keep running */
 	if ((etime.tasklist == NULL) || ((etime.count + count) <= etime.tasklist->count))
 	{
-		printf("here %llu\n", etime.count);
+		//printf("here %llu\n", etime.count);
 
 		etime.count += count;
 
-		printf("here %llu\n", etime.count);
+		//printf("here %llu\n", etime.count);
 
 	}
 	else /* switch to next task */
 	{
 
-		printf("here\n");
+		//printf("here\n");
 
 		await(&etime, etime.count + count);
 	}
@@ -139,7 +139,7 @@ static inline void find_next_task(eventcount *ec, count_t value){
   	etime.tasklist = curtask->tasklist;
   	etime.count = curtask->count;
 
-  	printf("curtask %s \n", curtask->name);
+  	//printf("curtask %s \n", curtask->name);
 	//printf("etime %s count %d\n", etime.tasklist->name, etime.tasklist->count);
 
   	return;
@@ -179,8 +179,8 @@ process *context_select(void){
 		etime.tasklist = curtask->tasklist;
 		etime.count = curtask->count;
 
-		printf("curtask %s count %llu\n", curtask->name, curtask->count);
-		printf("etime %s count %llu\n", etime.tasklist->name, etime.tasklist->count);
+		//printf("curtask %s count %llu\n", curtask->name, curtask->count);
+		//printf("etime %s count %llu\n", etime.tasklist->name, etime.tasklist->count);
 
 	}
 
@@ -230,7 +230,7 @@ void await (eventcount *ec, count_t value){
 
 void simulate (void){
 
-	printf("simulate called\n");
+	//printf("simulate called\n");
 
 	process *process = NULL;
 
@@ -248,15 +248,6 @@ void simulate (void){
 	}
 
 	return;
-}
-
-
-
-
-void context_destroy (process *p){
-
-	/* free stack space */
-	free (((context*)p)->stack);
 }
 
 /* create_task(task, stacksize) -- create a task with specified stack size. */
@@ -298,6 +289,12 @@ void remove_last_task (task *t){
 	return;
 }
 
+void context_destroy (process *p){
+
+	/* free stack space */
+	free (((context*)p)->stack);
+}
+
 
 void set_id(int id){
 
@@ -314,11 +311,6 @@ int get_id(void){
 
 char *get_task_name (void){
 
-	return curtask->name ? curtask->name : (char*)"-unknown-";
+	return curtask->name;
 }
 
-
-count_t get_time (void){
-
-	return etime.count;
-}
