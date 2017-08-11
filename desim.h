@@ -29,18 +29,17 @@ all we really care about.*/
 int setjmp32_2(jmp_buf __env);
 void longjmp32_2(jmp_buf __env, int val);
 
-int DecodeJMPBUF32(int j);
-int EncodeJMPBUF32(int j);
+int encode32(int val);
+int decode32(int val);
 
 #elif defined(__linux__) && defined(__x86_64)
 
 int setjmp64_2(jmp_buf __env);
 void longjmp64_2(jmp_buf __env, int val);
+
 long long encode64(long long val);
 long long decode64(long long val);
 
-long long DecodeJMPBUF64(long long j);
-long long EncodeJMPBUF64(long long j);
 
 #else
 #error Unsupported machine/OS combination

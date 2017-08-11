@@ -21,23 +21,6 @@ void desim_init(void){
 
 	initial_task_init();
 
-
-	long long addrin = 1234;
-	long long addrout = 0;
-
-	printf("address in %llu\n", addrin);
-
-	addrout = encode64(addrin);
-
-	printf("encoded address %llu\n", addrout);
-
-	addrin = decode64(addrout);
-
-	printf("decoded address %llu\n", addrin);
-
-	exit(0);
-
-
 	return;
 }
 

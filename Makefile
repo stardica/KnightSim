@@ -14,8 +14,8 @@ DESim64: desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o l
 		ar -r $(LIB_NAME_64) desim64.o eventcount64.o list64.o tasking64.o contexts64.o setjmp64.o longjmp64.o decode64.o encode64.o
 		@echo "Built $@ successfully"
 		
-DESim32: desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
-		ar -r $(LIB_NAME_32) desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o
+DESim32: desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o decode32.o encode32.o
+		ar -r $(LIB_NAME_32) desim32.o eventcount32.o list32.o tasking32.o contexts32.o setjmp32.o longjmp32.o decode32.o encode32.o
 		@echo "Built $@ successfully"
 
 
@@ -72,6 +72,12 @@ setjmp32.o: setjmp32.s
 
 longjmp32.o: longjmp32.s
 	$(CC) $(CC_FLAGS_32) longjmp32.s -c
+	
+decode32.o: decode32.s
+	$(CC) $(CC_FLAGS_32) decode32.s -c
+	
+encode32.o: encode32.s
+	$(CC) $(CC_FLAGS_32) encode32.s -c
 	
 
 clean:
