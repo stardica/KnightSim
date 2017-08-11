@@ -76,6 +76,16 @@ void context_init (process *p, void (*f)(void)){
 	p->c.buf[4] = ((int)((char*)p->c.stack + p->c.sz - 4));
 }
 
+void context_end(void){
+
+	longjmp32_2(main_context, 1);
+	return;
+}
+
+int context_simulate(void){
+
+	return setjmp32_2(main_context);
+}
 
 #elif defined(__linux__) && defined(__x86_64)
 
@@ -106,6 +116,18 @@ void context_init (process *p, void (*f)(void)){
 	p->c.start = f; /*assigns the head of a function*/
 	p->c.buf[7] = (long long)context_stub; /*where the jump will go to*/
 	p->c.buf[6] = (long long)((char *)p->c.stack + p->c.sz - 4); /*top of the stack*/
+}
+
+void context_end(void){
+
+	longjmp64_2(main_context, 1);
+	return;
+}
+
+
+int context_simulate(void){
+
+	return setjmp64_2(main_context);
 }
 
 #else

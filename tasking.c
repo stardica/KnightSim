@@ -131,7 +131,7 @@ static inline void find_next_task(eventcount *ec, count_t value){
 	{
 		context_cleanup ();
 
-		end_simulate();
+		context_end();
 	}
 
 	assert (curtask->count >= etime.count);
@@ -170,7 +170,7 @@ process *context_select(void){
 
 			printf("exiting after switch\n");
 
-			end_simulate();
+			context_end();
 		}
 
 		/*go through the list newest to oldest
@@ -235,7 +235,7 @@ void simulate (void){
 	process *process = NULL;
 
 	//simulate
-	if(!desim_end())
+	if(!context_simulate())
 	{
 		process = context_select();
 		assert(process);
@@ -244,7 +244,7 @@ void simulate (void){
 
 		context_cleanup();
 
-		end_simulate();
+		context_end();
 	}
 
 	return;

@@ -51,6 +51,8 @@ typedef struct context_t context;
 typedef struct task_s task;
 typedef struct process_record process;
 
+extern process *current_process;
+extern process *terminated_process;
 
 //id for eventcounts
 jmp_buf main_context;

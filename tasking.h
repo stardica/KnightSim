@@ -51,7 +51,6 @@ task *task_create(void (*func)(void), unsigned stacksize, char *name);
 
 void initial_task_init(void);
 
-
 void simulate(void);
 void epause(count_t);			/* wait argument time units */
 void await(eventcount *ec, count_t value);  /* wait for event >= arg */

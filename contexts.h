@@ -23,9 +23,11 @@
  * At any given instant, "current_process" points to the process record
  * for the currently executing thread of control.
  */
-extern process *current_process;
 
-extern process *terminated_process;
+
+int context_simulate(void);
+
+void context_end(void);
 
 
 /*
