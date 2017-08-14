@@ -58,96 +58,112 @@ typedef struct task_s task;
 typedef struct context_t context;
 typedef struct task_s task;
 typedef struct process_record process;
+typedef struct eventcount_s eventcount;
 
 //Eventcount objects
 struct eventcount_s {
 	char * name;		/* string name of event count */
 	long long id;
-	task *tasklist;	/* list of tasks waiting on this event */
+	/*task *tasklist;	 list of tasks waiting on this event */
+	context *contextlist;
 	count_t count;		/* current value of event */
 	struct eventcount_s* eclist; /* pointer to next event count */
 };
-
-typedef struct eventcount_s eventcount;
 
 /* Global eventcount (cycle time) */
 extern eventcount etime;
 extern eventcount *ectail;
 extern eventcount *last_ec; /* to work with context library */
 
-
 //Context objects
 struct context_t{
-  jmp_buf buf;			/*state */
-  char *stack;			/*stack */
-  int sz;				/*stack size*/
-  void (*start) ();		/*entry point*/
-};
-
-struct task_s{
-	task *tasklist;	/* pointer to next task on the same list */
-
+	jmp_buf buf;		/*state */
 	char *name;			/* task name */
-	count_t count;		/* argument to await */
-
-	void *cdata2;		/* argument (don't ask why)! */
-	void *arg2;			/* arg to the function! */
-	void (*f)(void *);	/* startup function if necessary */
-
 	int id;				/* task id */
+
+	count_t count;		/* argument to await */
+	context *contextlist;
+	void (*start)(void);	/*entry point*/
+
+
 	unsigned magic;		/* stack overflow check */
-	context c;		  	/* context switch info */
+	char *stack;		/*stack */
+	int stacksize;		/*stack size*/
 };
 
-struct process_record {
+/*struct task_s{
+	task *tasklist;	 pointer to next task on the same list
+
+	char *name;			 task name
+	count_t count;		 argument to await
+
+	void *cdata2;		 argument (don't ask why)!
+	void *arg2;			 arg to the function!
+	void (*f)(void *);	 startup function if necessary
+
+	int id;				 task id
+	unsigned magic;		 stack overflow check
+	context c;		  	 context switch info
+};*/
+
+/*struct process_record {
   context c;
-};
+};*/
 
 
-extern process *current_process;
-extern process *terminated_process;
-extern task inittask;
+
+context *current_context;
+context *terminated_context;
+
+/*extern task inittask;
 extern task *curtask;
-extern task *hint;
+extern task *hint;*/
+
+context inittask;
+context *curtask;
+context *hint;
 
 jmp_buf main_context;
+
 extern long long ecid; //id for each event count
+
 extern count_t last_value;
 
 
 //DESim entry and exit functions
 void desim_init(void);
-void end_simulate(void);
-int desim_end(void);
-task *context_create(void (*func)(void), unsigned stacksize, char *name);
+context *context_create(void (*func)(void), unsigned stacksize, char *name);
 void initial_task_init(void);
 void simulate(void);
 void epause(count_t);			/* wait argument time units */
 void await(eventcount *ec, count_t value);  /* wait for event >= arg */
+void advance(eventcount *ec);
 void switch_context (eventcount *ec, count_t value);
 
 //eventcount manipulation functions
 void etime_init(void);
-eventcount *eventcount_create (char *name);
+eventcount *eventcount_create(char *name);
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
-void advance(eventcount *ec);
+
 void eventcount_destroy(eventcount *ec);
 
 
 //task manipulation functions
 count_t get_time(void);
 char *get_task_name(void);
-void remove_last_task(task *);
+void remove_last_context(context *last_context);
+
+void context_find_next(eventcount *ec, count_t value);
 
 void context_set_id(int id);
 int context_get_id(void);
 int context_simulate(void);
 void context_end(void);
-extern process *context_select(void);
-extern void context_switch(process *p);
-extern void context_exit(void);
-extern void context_cleanup(void);
-extern void context_init(process *p, void (*f)(void));
-extern void context_destroy(process *p);
+context *context_select(void);
+void context_switch(context *ctx);
+void context_exit(void);
+void context_cleanup(void);
+void context_init(context *new_context);
+void context_destroy(context *ctx);
 
 #endif /*__DESim_H__*/
