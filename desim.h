@@ -60,9 +60,9 @@ typedef struct eventcount_s eventcount;
 struct eventcount_s {
 	char * name;		/* string name of event count */
 	long long id;
-	context *contextlist;
+	context *nextcontext;
 	count_t count;		/* current value of event */
-	struct eventcount_s* eclist; /* pointer to eclist head */
+	eventcount *nextec; /* pointer to eclist head */
 };
 
 
@@ -72,7 +72,7 @@ struct context_t{
 	char *name;			/* task name */
 	int id;				/* task id */
 	count_t count;		/* argument to await */
-	context *contextlist;
+	context *nextcontext;
 	void (*start)(void);	/*entry point*/
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
@@ -101,11 +101,10 @@ void simulate(void);
 void pause(count_t);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
-
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
 void eventcount_destroy(eventcount *ec);
-
 void context_init(context *new_context);
+void context_stub(void);
 void context_next(eventcount *ec, count_t value);
 void context_remove_last(context *last_context);
 void context_find_next(eventcount *ec, count_t value);
