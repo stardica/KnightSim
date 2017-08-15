@@ -27,22 +27,21 @@ context *terminated_context = NULL;
 
 void desim_init(void){
 
-	//init etime
-	etime_init();
-
-	initial_task_init();
-
-	return;
-}
-
-void etime_init(void){
-
+	//set up etime
 	etime.name = NULL;
 	etime.id = 0;
 	etime.count = 0;
 	//etime.tasklist = NULL;
 	etime.contextlist = NULL;
 	etime.eclist = NULL;
+
+	//set up initial task
+	inittask.contextlist = NULL;
+	inittask.name = strdup("initial task");
+	inittask.count = 0;
+	inittask.start = NULL;
+	inittask.id = -1;
+	inittask.magic = STK_OVFL_MAGIC;
 
 	return;
 }
@@ -71,6 +70,7 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->eclist = NULL;
 
 
+
 	//create singly linked list
     if (ectail == NULL)
     {
@@ -83,7 +83,7 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
     	ectail->eclist = ec;
     }
 
-    //move to new tail!
+    //point to new tail!
     ectail = ec;
 
     return;
@@ -92,8 +92,6 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 /* advance(ec) -- increment an event count. */
 /* Don't use on time event count! */
 void advance(eventcount *ec){
-
-	//printf("desim advance ec name %s\n", ec->name);
 
 	context *context_ptr = NULL;
 	context *context_pptr = NULL;
@@ -168,6 +166,7 @@ void eventcount_destroy(eventcount *ec){
 	   }
 
 	   assert(found == 1);
+
 	   if (ectail == ec)
 	   {
 		   ectail = back;
@@ -175,18 +174,6 @@ void eventcount_destroy(eventcount *ec){
 	}
 }
 
-
-void initial_task_init(void){
-
-	inittask.contextlist = NULL;
-	inittask.name = strdup("initial task");
-	inittask.count = 0;
-	inittask.start = NULL;
-	inittask.id = -1;
-	inittask.magic = STK_OVFL_MAGIC;
-
-	return;
-}
 
 void pause(count_t count){
 
@@ -216,7 +203,6 @@ void context_find_next(eventcount *ec, count_t value){
 	{
 		assert(curtask);
 
-		/* insert at head of list */
 		ec->contextlist = curtask;
 		curtask->contextlist = context_pptr;  //same as ec->tasklist = pptr
 	}
@@ -277,6 +263,7 @@ void context_find_next(eventcount *ec, count_t value){
 
 	assert(curtask->count >= etime.count);
 
+	//moves etime down the context list
   	etime.contextlist = curtask->contextlist;
   	etime.count = curtask->count;
 
@@ -292,6 +279,9 @@ context *context_select(void){
 	}
 	else
 	{
+		/*curtask points to the next task in the task list
+		head of the taks list*/
+
 		curtask = etime.contextlist;
 
 		if (hint == curtask)
@@ -305,6 +295,7 @@ context *context_select(void){
 			context_end();
 		}
 
+		//move down one context
 		etime.contextlist = curtask->contextlist;
 		etime.count = curtask->count;
 	}
@@ -356,14 +347,13 @@ void simulate(void){
 		context_switch(next_context);
 
 		context_cleanup();
-
 		context_end();
 	}
 
 	return;
 }
 
-context *context_create(void (*func)(void), unsigned stacksize, char *name){
+void context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	/*stacksize should be multiple of unsigned size */
 	assert ((stacksize % sizeof(unsigned)) == 0);
@@ -389,7 +379,7 @@ context *context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	context_init(new_context_ptr);
 
-	return new_context_ptr;
+	return;
 }
 
 
