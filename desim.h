@@ -130,40 +130,34 @@ extern long long ecid; //id for each event count
 extern count_t last_value;
 
 
-//DESim entry and exit functions
+//DESim user level functions
 void desim_init(void);
-context *context_create(void (*func)(void), unsigned stacksize, char *name);
-void initial_task_init(void);
 void simulate(void);
-void epause(count_t);			/* wait argument time units */
+void pause(count_t);			/* wait argument time units */
 void await(eventcount *ec, count_t value);  /* wait for event >= arg */
 void advance(eventcount *ec);
-void switch_context (eventcount *ec, count_t value);
 
-//eventcount manipulation functions
 void etime_init(void);
-eventcount *eventcount_create(char *name);
+void initial_task_init(void);
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
-
 void eventcount_destroy(eventcount *ec);
+eventcount *eventcount_create(char *name);
 
 
-//task manipulation functions
-count_t get_time(void);
-char *get_task_name(void);
-void remove_last_context(context *last_context);
-
+context *context_create(void (*func)(void), unsigned stacksize, char *name);
+void context_init(context *new_context);
+void context_next(eventcount *ec, count_t value);
+void context_remove_last(context *last_context);
 void context_find_next(eventcount *ec, count_t value);
-
-void context_set_id(int id);
-int context_get_id(void);
 int context_simulate(void);
 void context_end(void);
 context *context_select(void);
 void context_switch(context *ctx);
 void context_exit(void);
 void context_cleanup(void);
-void context_init(context *new_context);
 void context_destroy(context *ctx);
+
+//util functions
+void desim_list_insert(context *ptr1, context *ptr2);
 
 #endif /*__DESim_H__*/

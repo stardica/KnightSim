@@ -7,7 +7,6 @@ CC_FLAGS_32 = -g3 -O3 -Wall -m32
 
 CC = gcc
 
-
 all: DESim64 DESim32
 
 DESim64: desim64.o list64.o setjmp64.o longjmp64.o decode64.o encode64.o
@@ -17,7 +16,6 @@ DESim64: desim64.o list64.o setjmp64.o longjmp64.o decode64.o encode64.o
 DESim32: desim32.o list32.o setjmp32.o longjmp32.o decode32.o encode32.o
 		ar -r $(LIB_NAME_32) desim32.o list32.o setjmp32.o longjmp32.o decode32.o encode32.o
 		@echo "Built $@ successfully"
-
 
 
 #64 bit versions

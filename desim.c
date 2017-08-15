@@ -13,9 +13,16 @@
 
 #include "desim.h"
 
-
+context inittask;
+context *curtask = &inittask;
+context *hint = NULL;
+eventcount etime;
+eventcount *ectail = NULL;
+eventcount *last_ec = NULL; /* to work with context library */
 long long ecid = 0;
 count_t last_value = 0;
+context *current_context = NULL;
+context *terminated_context = NULL;
 
 
 void desim_init(void){
@@ -27,12 +34,6 @@ void desim_init(void){
 
 	return;
 }
-
-/*eventcount.c********************/
-eventcount etime;
-eventcount *ectail = NULL;
-eventcount *last_ec = NULL; /* to work with context library */
-
 
 void etime_init(void){
 
@@ -175,24 +176,11 @@ void eventcount_destroy(eventcount *ec){
 }
 
 
-/*tasking.h**********************************/
-
-/*task inittask;
-task *curtask = &inittask;
-task *hint = NULL;*/
-
-context inittask;
-context *curtask = &inittask;
-context *hint = NULL;
-
-
 void initial_task_init(void){
 
 	inittask.contextlist = NULL;
 	inittask.name = strdup("initial task");
 	inittask.count = 0;
-	//inittask.cdata2 = NULL;
-	//inittask.arg2 = NULL;
 	inittask.start = NULL;
 	inittask.id = -1;
 	inittask.magic = STK_OVFL_MAGIC;
@@ -200,27 +188,17 @@ void initial_task_init(void){
 	return;
 }
 
-/* epause(N) -- wait N cycles.  Equivalent to await(etime, etime.c+N) */
-void epause (count_t count){
-
-	//printf("desim: epause start\n");
+void pause(count_t count){
 
 	/* if no tasks or still first task, keep running */
 	if ((etime.contextlist == NULL) || ((etime.count + count) <= etime.contextlist->count))
 	{
-		//printf("desim: epause if\n");
-
 		etime.count += count;
-
 	}
 	else /* switch to next task */
 	{
-		//printf("desim: epause else\n");
-
 		await(&etime, etime.count + count);
 	}
-
-	//printf("desim: epause end\n");
 
 	return;
 }
@@ -302,19 +280,13 @@ void context_find_next(eventcount *ec, count_t value){
   	etime.contextlist = curtask->contextlist;
   	etime.count = curtask->count;
 
-  	//printf("curtask %s \n", curtask->name);
-	//printf("etime %s count %d\n", etime.tasklist->name, etime.tasklist->count);
-
   	return;
 }
 
 context *context_select(void){
 
-	//printf("context select\n");
-
 	if (last_ec)
 	{
-		//printf("finding next\n");
 		context_find_next(last_ec, last_value);
 		last_ec = NULL;
 	}
@@ -330,27 +302,17 @@ context *context_select(void){
 		if (curtask == NULL)
 		{
 			context_cleanup();
-
-			//printf("exiting after switch\n");
-
 			context_end();
 		}
 
-		/*go through the list newest to oldest
-		etime is now pointing back one element in the list*/
-
 		etime.contextlist = curtask->contextlist;
 		etime.count = curtask->count;
-
-		//printf("curtask %s count %llu\n", curtask->name, curtask->count);
-		//printf("etime %s count %llu\n", etime.tasklist->name, etime.tasklist->count);
-
 	}
 
 	return curtask;
 }
 
-void switch_context (eventcount *ec, count_t value){
+void context_next(eventcount *ec, count_t value){
 
 	context *ctx = NULL;
 	last_ec = ec;
@@ -359,14 +321,7 @@ void switch_context (eventcount *ec, count_t value){
 	ctx = context_select();
 	assert(ctx);
 
-	/*printf("selcted context %s\n", ctx->name);
-	printf("current ctx name %s\n", current_context->name);*/
-
-	//if (p)
-	//{
 	context_switch(ctx);
-	//}
-
 
 	return;
 }
@@ -375,19 +330,13 @@ void switch_context (eventcount *ec, count_t value){
 /* await(ec, value) -- suspend until ec.c >= value. */
 void await (eventcount *ec, count_t value){
 
-	//printf("desim await\n");
-
 	/*todo*/
 	/*check for stack overflows*/
-
-	// if stack overflowed before call to await, it will most likely have
-	// thrashed magic.
-	/*assert(curtask->magic == STK_OVFL_MAGIC);*/
 
 	if (ec->count >= value)
 		return;
 
-	switch_context(ec, value);
+	context_next(ec, value);
 
 	return;
 }
@@ -395,8 +344,6 @@ void await (eventcount *ec, count_t value){
 
 
 void simulate(void){
-
-	//printf("simulate\n");
 
 	//simulate
 	if(!context_simulate())
@@ -436,6 +383,7 @@ context *context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	/*list work. forms a singly linked list, with newest task at the head.
 	etime points to the head of the list*/
+	//desim_list_insert(new_context_ptr->contextlist, etime.contextlist);
 	new_context_ptr->contextlist = etime.contextlist;
 	etime.contextlist = new_context_ptr;
 
@@ -446,7 +394,7 @@ context *context_create(void (*func)(void), unsigned stacksize, char *name){
 
 
 // delete last inserted task
-void remove_last_task(context *last_context){
+void context_remove_last(context *last_context){
 
 	assert (etime.contextlist == last_context);
 	etime.contextlist = last_context->contextlist;
@@ -462,28 +410,9 @@ void context_destroy(context *ctx){
 }
 
 
-void context_set_id(int id){
-
-	curtask->id = id;
-	return;
-}
-
-
-int context_get_id(void){
-
-	return curtask->id;
-}
-
-
-char *get_task_name (void){
-
-	return curtask->name;
-}
-
 /*context.c*******************************************/
 /* current process and terminated process */
-context *current_context = NULL;
-context *terminated_context = NULL;
+
 
 
 void context_cleanup(void){
@@ -520,38 +449,39 @@ void context_stub(void){
 
   context_switch(context_select());
 
+  return;
 }
 
 void context_exit (void){
 
   terminated_context = current_context;
   context_switch (context_select ());
+  return;
 }
 
 
 #if defined(__linux__) && defined(__i386__)
 
-void context_switch (process *p)
+void context_switch (context *ctx)
 {
 
-	if (!current_process || !setjmp32_2(current_process->c.buf))
+	if (!current_context || !setjmp32_2(current_context->buf))
 	{
-	  current_process = p;
-	  longjmp32_2(p->c.buf, 1);
+	  current_context = ctx;
+	  longjmp32_2(ctx->buf, 1);
 	}
-	if (terminated_process)
+	if (terminated_context)
 	{
-	  context_destroy (terminated_process);
-	  terminated_process = NULL;
+	  context_destroy (terminated_context);
+	  terminated_context = NULL;
 	}
 
 }
 
-void context_init (process *p, void (*f)(void)){
+void context_init (context *new_context){
 
-	p->c.start = f; /*assigns the head of a function*/
-	p->c.buf[5] = ((int)context_stub);
-	p->c.buf[4] = ((int)((char*)p->c.stack + p->c.sz - 4));
+	new_context->buf[5] = ((int)context_stub);
+	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
 }
 
 void context_end(void){
@@ -569,37 +499,24 @@ int context_simulate(void){
 
 void context_switch (context *ctx){
 
-	//printf("context switch ctx name %s\n", ctx->name);
-	//printf("context 0x%016x\n", ctx->buf[7]);
-
-	//printf("val %d\n", setjmp64_2(ctx->buf));
-
-	/*if(!current_context)
-		printf("no current context val %d\n", !current_context);
-	else
-		printf("current context name %s val %d\n", current_context->name, !current_context);*/
-
 	//setjmp returns 1 if jumping to this position via longjmp
 	if (!current_context || !setjmp64_2(current_context->buf))
 	{
-		/*first round takes us to context stub
-		subsequent rounds take us to an await or pause*/
+		/*ok, this is deep wizardry....
+		note that the jump is to the next context and the
+		setjmp is for the current context
+		if the */
 
-		//printf("jumping!\n");
-
-	  current_context = ctx;
-	  longjmp64_2(ctx->buf, 1);
+		current_context = ctx;
+		longjmp64_2(ctx->buf, 1);
 	}
-
 
 	if (terminated_context)
 	{
-	  context_destroy(terminated_context);
-	  terminated_context = NULL;
+		context_destroy(terminated_context);
+		terminated_context = NULL;
 	}
 
-
-  	//printf("context switch end name %s\n", current_context->name);
 	return;
 }
 
@@ -607,9 +524,7 @@ void context_switch (context *ctx){
 void context_init(context *new_context){
 
 	/*these are in this function because they are architecture dependent.
-	don't move these out of this function*/
-
-	//printf("ctx stuff addr 0x%016x\n", context_stub);
+	don't move these out of this function!!!!*/
 
 	new_context->buf[7] = (long long)context_stub; /*where the initial jump will go to*/
 	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4); /*points to top of the virtual stack*/

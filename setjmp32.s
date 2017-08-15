@@ -23,8 +23,6 @@ setjmp32_2:
  ret
 
 
-
-
  /*
  .section .text
 .globl setjmp32_2
