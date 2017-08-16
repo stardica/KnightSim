@@ -5,6 +5,7 @@
  *      Author: stardica
  */
 
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +29,7 @@ context *terminated_context = NULL;
 void desim_init(void){
 
 	//set up etime
-	etime.name = NULL;
+	etime.name = strdup("etime");
 	etime.id = 0;
 	etime.count = 0;
 	//etime.tasklist = NULL;
@@ -58,7 +59,33 @@ eventcount *eventcount_create(char *name){
 	return ec;
 }
 
+void context_create(void (*func)(void), unsigned stacksize, char *name){
 
+	/*stacksize should be multiple of unsigned size */
+	assert ((stacksize % sizeof(unsigned)) == 0);
+
+	context *new_context_ptr = NULL;
+
+	new_context_ptr = (context *) malloc(sizeof(context));
+	assert(new_context_ptr);
+
+	new_context_ptr->count = etime.count;
+	new_context_ptr->name = name;
+	new_context_ptr->stack = (char *)malloc(stacksize);
+	assert(new_context_ptr->stack);
+	new_context_ptr->stacksize = stacksize;
+	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
+	new_context_ptr->start = func; /*assigns the head of a function*/
+
+	/*list work. forms a singly linked list, with newest task at the head.
+	etime.contextlist points to the head of the list*/
+	new_context_ptr->nextcontext = etime.nextcontext;
+	etime.nextcontext = new_context_ptr;
+
+	context_init(new_context_ptr);
+
+	return;
+}
 
 void eventcount_init(eventcount * ec, count_t count, char *ecname){
 
@@ -68,8 +95,6 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->nextcontext = NULL;
 	ec->count = count;
 	ec->nextec = NULL;
-
-
 
 	//create singly linked list
     if (ectail == NULL)
@@ -96,12 +121,13 @@ void advance(eventcount *ec){
 	context *context_ptr = NULL;
 	context *context_pptr = NULL;
 
-	/* advance count */
+	/* advance the ec's count */
 	ec->count++;
+
+	context_ptr = ec->nextcontext;
 
 	/* check for no tasks being enabled */
 	printf("ec name %s value %llu\n", ec->name, ec->count);
-	context_ptr = ec->nextcontext;
 
 	if(!context_ptr)
 		printf("no ctx yet\n");
@@ -109,11 +135,11 @@ void advance(eventcount *ec){
 		printf("ec %s val %llu ctx %s val %llu\n", ec->name, ec->count, context_ptr->name, context_ptr->count);
 
 
-
 	if ((context_ptr == NULL) || (context_ptr->count > ec->count))
 	{
 		//no context waiting on this eventcount
 		printf("advance returning ctx null\n");
+		printf("----\n");
 		return;
 	}
 
@@ -125,6 +151,7 @@ void advance(eventcount *ec){
 	{
 		/* set tasks time equal to current time */
 		context_ptr->count = etime.count;
+		printf("traversing list ctx ptr name %s val %llu\n", context_ptr->name, context_ptr->count);
 		context_pptr = context_ptr;
 		context_ptr = context_ptr->nextcontext;
 
@@ -138,7 +165,6 @@ void advance(eventcount *ec){
 	}while(context_ptr && (context_ptr->count == ec->count));
 
 
-	/* add list of events to etime */
 	context_pptr->nextcontext = etime.nextcontext;
 	printf("context_pptr->nextcontext pts to %s\n", context_pptr->nextcontext->name);
 
@@ -147,13 +173,13 @@ void advance(eventcount *ec){
 	printf("etime next %s\n", etime.nextcontext->name);
 
 
-
 	//sets list null
 	ec->nextcontext = context_ptr;
 	if(!ec->nextcontext)
 		printf("yes ec->contextlist = null\n");
 
 
+	printf("----\n");
 	return;
 }
 
@@ -211,6 +237,8 @@ void eventcount_destroy(eventcount *ec){
 
 void pause(count_t count){
 
+	printf("pause\n");
+
 	/* if no tasks or still first task, keep running */
 	if ((etime.nextcontext == NULL) || ((etime.count + count) <= etime.nextcontext->count))
 	{
@@ -219,7 +247,8 @@ void pause(count_t count){
 	}
 	else /* switch to next task */
 	{
-		printf("await etime\n");
+		printf("awaiting etime.count + count\n");
+		printf("---\n");
 		await(&etime, etime.count + count);
 	}
 
@@ -229,6 +258,7 @@ void pause(count_t count){
 /* save current task on ec, return next task to run */
 void context_find_next(eventcount *ec, count_t value){
 
+	printf("context_find_next\n");
 	context *context_pptr = NULL;
 
 	context_pptr = ec->nextcontext;
@@ -241,14 +271,17 @@ void context_find_next(eventcount *ec, count_t value){
 
 		printf("find next ctx null or value low\n");
 
+		//no task or still a task that needs to run
+		//the next one is the current task
 		ec->nextcontext = curtask;
 
+		//and its next task is what we are pointing too
 		curtask->nextcontext = context_pptr;
 
-		if(!curtask->nextcontext)
+		/*if(!curtask->nextcontext)
 			printf("curtask->contextlist null\n");
 
-		printf("ec %s waiting task %s\n", ec->name, ec->nextcontext->name);
+		printf("ec %s waiting task %s\n", ec->name, ec->nextcontext->name);*/
 
 	}
 	else
@@ -256,12 +289,11 @@ void context_find_next(eventcount *ec, count_t value){
 
 		printf("insert into list ctx %s\n", context_pptr->name);
 
-		/* insert in middle of list */
 		context *context_ptr = NULL;
 
 		bool time_list = (ec == &etime); //determines if this is etime or not.
 
-		printf("time list %d\n", time_list);
+		printf("ec is ETIME (time list %d)\n", time_list);
 
 		//time list is 1 if this ec is etime
 		if (time_list && hint && (value >= hint->count))
@@ -277,7 +309,7 @@ void context_find_next(eventcount *ec, count_t value){
 			printf("ptr (%s) = pptr (%s) pptr next (%s)\n", context_ptr->name, context_pptr->name, context_pptr->nextcontext->name);
 		}
 
-		//go down the list until you find an older task
+		//look down the list for an older tasks (i.e. looking for value < ctx count)
 		while (context_ptr && (value >= context_ptr->count))
 		{
 			context_pptr = context_ptr;
@@ -296,7 +328,7 @@ void context_find_next(eventcount *ec, count_t value){
 			curtask->nextcontext = context_ptr;
 
 			if(!curtask->nextcontext)
-				printf("yes no curtask next\n");
+				printf("curtask name %s no next element\n", curtask->name);
 		}
 
 		//working with etime, thus hint is the curtask
@@ -306,18 +338,30 @@ void context_find_next(eventcount *ec, count_t value){
 		}
 	}
 
-	printf("before curtask count %llu\n", curtask->count);
+
+	//sets when this task should execute next (cycles).
 	curtask->count = value;
-	printf("after curtask count %llu\n", curtask->count);
+
+	printf("curtask name %s count %llu\n", curtask->name, curtask->count);
 
 	/*get next task to run*/
+
+	//change curtask to the next task
 	curtask = etime.nextcontext;
+
+	if(context_pptr)
+		printf("curtask name %s count %llu ctx pptr name %s count %llu nextname %s count %llu\n",
+				curtask->name, curtask->count, context_pptr->name, context_pptr->count, context_pptr->nextcontext->name, context_pptr->nextcontext->count);
+	else
+		printf("curtask name %s count %llu ctx pptr null\n", curtask->name, curtask->count);
 
 	if (hint == curtask)
 	{
+		printf("hint == curtask\n");
 		hint = NULL;
 	}
 
+	//if there is no new task exit
 	if (curtask == NULL)
 	{
 		context_cleanup();
@@ -325,33 +369,44 @@ void context_find_next(eventcount *ec, count_t value){
 		context_end();
 	}
 
+	//the new task should be something that runs in the future.
 	assert(curtask->count >= etime.count);
 
-	//moves etime down the context list
+	//moves etime to oldest ctx in list
   	etime.nextcontext = curtask->nextcontext;
-  	printf("etime next %s curtask %s curtask next %s\n", etime.nextcontext->name, curtask->name, curtask->nextcontext->name);
-  	etime.count = curtask->count;
 
+  	if(etime.nextcontext)
+  		printf("etime.nextcontext name %s count %llu\n", etime.nextcontext->name, etime.nextcontext->count);
+  	else
+  		printf("yes etime.next null\n");
+
+  	etime.count = curtask->count; //set etime.count to next ctx's count (why?)
+
+  	printf("---\n");
   	return;
 }
 
 context *context_select(void){
 
+	printf("context_select\n");
+
 	if (last_ec)
 	{
 		printf("here1\n");
+		printf("---\n");
 		context_find_next(last_ec, last_value);
 		last_ec = NULL;
 	}
 	else
 	{
-		/*curtask points to the next task in the task list
-		head of the taks list*/
+		/*curtask points to the next ctx in the ctx list*/
 		printf("here2\n");
 
 		//set current task here
 		curtask = etime.nextcontext;
-		printf("curtask name %s\n", curtask->name);
+
+		if(curtask)
+			printf("curtask name %s\n", curtask->name);
 
 		if (hint == curtask)
 		{
@@ -372,15 +427,18 @@ context *context_select(void){
 		printf("after et count %llu curtask count %llu\n", etime.count, curtask->count);
 	}
 
+	printf("---\n");
 	return curtask;
 }
 
 void context_next(eventcount *ec, count_t value){
 
+	printf("context next\n");
 	context *ctx = NULL;
 	last_ec = ec; //these are global because context select doesn't take a variable in
 	last_value = value;
 
+	printf("---\n");
 	ctx = context_select();
 	assert(ctx);
 
@@ -396,16 +454,22 @@ void await (eventcount *ec, count_t value){
 	/*todo*/
 	/*check for stack overflows*/
 
+	printf("await\n");
+
 	if (ec->count >= value)
 	{
 		printf("await, count >= value\n");
+
+		printf("---\n");
 		return;
 	}
 
-	printf("await finding next ctx cur ec %s curtask %s\n", ec->name, curtask->name);
+	printf("await finding next ctx cur ec %s curtask %s value %llu\n", ec->name, curtask->name, value);
 
+	printf("---\n");
 	context_next(ec, value);
 
+	printf("---\n");
 	return;
 }
 
@@ -430,33 +494,10 @@ void simulate(void){
 	return;
 }
 
-void context_create(void (*func)(void), unsigned stacksize, char *name){
 
-	/*stacksize should be multiple of unsigned size */
-	assert ((stacksize % sizeof(unsigned)) == 0);
 
-	context *new_context_ptr = NULL;
 
-	new_context_ptr = (context *) malloc(sizeof(context));
-	assert(new_context_ptr);
 
-	new_context_ptr->count = etime.count;
-	new_context_ptr->name = name;
-	new_context_ptr->stack = (char *)malloc(stacksize);
-	assert(new_context_ptr->stack);
-	new_context_ptr->stacksize = stacksize;
-	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
-	new_context_ptr->start = func; /*assigns the head of a function*/
-
-	/*list work. forms a singly linked list, with newest task at the head.
-	etime.contextlist points to the head of the list*/
-	new_context_ptr->nextcontext = etime.nextcontext;
-	etime.nextcontext = new_context_ptr;
-
-	context_init(new_context_ptr);
-
-	return;
-}
 
 
 // delete last inserted task
@@ -469,15 +510,14 @@ void context_remove_last(context *last_context){
 	return;
 }
 
+
+
 void context_destroy(context *ctx){
 
 	/* free stack space */
 	free(ctx->stack);
 }
 
-
-/*context.c*******************************************/
-/* current process and terminated process */
 
 
 
@@ -493,6 +533,8 @@ void context_cleanup(void){
 }
 
 
+
+
 void context_stub(void){
 
   printf("context stub\n");
@@ -504,6 +546,7 @@ void context_stub(void){
   }
 
 
+  printf("----\n");
   (*current_context->start)();
 
   /*if current current ctx returns i.e. hits the bottom of its function
@@ -517,6 +560,8 @@ void context_stub(void){
 
   return;
 }
+
+
 
 void context_exit (void){
 
@@ -564,6 +609,8 @@ int context_simulate(void){
 #elif defined(__linux__) && defined(__x86_64)
 
 void context_switch (context *ctx){
+
+	printf("context_switch");
 
 	//setjmp returns 1 if jumping to this position via longjmp
 	if (!current_context || !setjmp64_2(current_context->buf))
