@@ -1,17 +1,12 @@
 #ifndef __DESim_H__
 #define __DESim_H__
 
-#include "list.h"
-
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 32768
 #endif
 
 #define TASKING_MAGIC_NUMBER 0x5a5a5a5a
 #define STK_OVFL_MAGIC 0x12349876 /* stack overflow check */
-
-typedef int bool;
-enum {false, true};
 
 #ifdef TIME_64
 typedef unsigned long long Time_t;
@@ -51,20 +46,29 @@ int decode32(int val);
 #error Unsupported machine/OS combination
 #endif
 
-
 typedef Time_t count_t;
 typedef struct context_t context;
 typedef struct eventcount_s eventcount;
+typedef struct list_t list;
+
+struct list_t{
+	char *name;
+	int count;  /* Number of elements in the list */
+	int size;  /* Size of allocated vector */
+	int head;  /* Head element in vector */
+	int tail;  /* Tail element in vector */
+	void **elem;  /* Vector of elements */
+};
 
 //Eventcount objects
-struct eventcount_s {
+struct eventcount_s{
 	char * name;		/* string name of event count */
 	long long id;
 	context *nextcontext;
+	list *ctxlist;
 	count_t count;		/* current value of event */
 	eventcount *nextec; /* pointer to eclist head */
 };
-
 
 //Context objects
 struct context_t{
@@ -73,12 +77,15 @@ struct context_t{
 	int id;				/* task id */
 	count_t count;		/* argument to await */
 	context *nextcontext;
+	list *ctxlist;
 	void (*start)(void);	/*entry point*/
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
 	int stacksize;		/*stack size*/
 };
 
+typedef int bool;
+enum {false, true};
 
 /* Globals*/
 eventcount etime;
@@ -86,9 +93,9 @@ eventcount *ectail;
 eventcount *last_ec; /* to work with context library */
 context *current_context;
 context *terminated_context;
-context inittask;
-context *curtask;
-context *hint;
+context initctx;
+context *curctx;
+context *ctxhint;
 jmp_buf main_context;
 long long ecid; //id for each event count
 count_t last_value;
@@ -116,7 +123,32 @@ void context_exit(void);
 void context_cleanup(void);
 void context_destroy(context *ctx);
 
-//util functions
-void desim_list_insert(context *ptr1, context *ptr2);
+//DESim util stuff
+#define LIST_FOR_EACH(list, iter) \
+	for ((iter) = 0; (iter) < list_count((list_ptr)); (iter)++)
+#define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
+#define ELEM(X) list_ptr->elem[((X) + list_ptr->head) % list_ptr->size]
+
+list *desim_list_create(unsigned int size);
+void desim_list_free(list *list_ptr);
+int desim_list_count(list *list_ptr);
+void desim_list_add(list *list_ptr, void *elem);
+void desim_list_grow(list *list_ptr);
+void desim_list_push(list *list_ptr, void *elem);
+void *desim_list_pop(list *list_ptr);
+void desim_list_enqueue(list *list_ptr, void *elem);
+void *desim_list_dequeue(list *list_ptr);
+void *desim_list_remove_at(list *list_ptr, int index);
+void *desim_list_remove(list *list_ptr, void *elem);
+
+/*void desim_list_clear(struct list_t *list);
+void *desim_list_get(struct list_t *list, int index);
+void list_set(struct list_t *list, int index, void *elem);
+void list_insert(struct list_t *list, int index, void *elem);
+int list_index_of(struct list_t *list, void *elem);
+void *list_top(struct list_t *list);
+void *list_bottom(struct list_t *list);
+void *list_head(struct list_t *list);
+void *list_tail(struct list_t *list);*/
 
 #endif /*__DESim_H__*/

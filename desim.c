@@ -14,9 +14,9 @@
 
 #include "desim.h"
 
-context inittask;
-context *curtask = &inittask;
-context *hint = NULL;
+context initctx;
+context *curctx = &initctx;
+context *ctxhint = NULL;
 eventcount etime;
 eventcount *ectail = NULL;
 eventcount *last_ec = NULL; /* to work with context library */
@@ -32,17 +32,18 @@ void desim_init(void){
 	etime.name = strdup("etime");
 	etime.id = 0;
 	etime.count = 0;
-	//etime.tasklist = NULL;
 	etime.nextcontext = NULL;
 	etime.nextec = NULL;
+	etime.ctxlist = desim_list_create(4);
 
 	//set up initial task
-	inittask.nextcontext = NULL;
-	inittask.name = strdup("initial task");
-	inittask.count = 0;
-	inittask.start = NULL;
-	inittask.id = -1;
-	inittask.magic = STK_OVFL_MAGIC;
+	initctx.nextcontext = NULL;
+	initctx.name = strdup("init ctx");
+	initctx.count = 0;
+	initctx.start = NULL;
+	initctx.id = -1;
+	initctx.magic = STK_OVFL_MAGIC;
+	initctx.ctxlist = desim_list_create(4);
 
 	return;
 }
@@ -134,7 +135,10 @@ void advance(eventcount *ec){
 	else
 		printf("ec %s val %llu ctx %s val %llu\n", ec->name, ec->count, context_ptr->name, context_ptr->count);
 
-
+	/*compare waiting ctx to current ctx
+	and if the waiting ctx is ready continue
+	if the ctx's count is greater than the ec's count
+	the ctx must continue to wait*/
 	if ((context_ptr == NULL) || (context_ptr->count > ec->count))
 	{
 		//no context waiting on this eventcount
@@ -143,10 +147,10 @@ void advance(eventcount *ec){
 		return;
 	}
 
-	//check
-	int i = 0;
+	/*if here, there is a ctx(s) waiting on this ec AND its ready to run*/
 
-	/* advance down ec's task list */
+	/*find the end of the ec's task list
+	and set all ctx time to current time (etime.cout)*/
 	do
 	{
 		/* set tasks time equal to current time */
@@ -158,22 +162,29 @@ void advance(eventcount *ec){
 		if(!context_ptr)
 			printf("ctx ptr is null!\n");
 
-		assert(i == 0);
-
-		i++;
+		/*when ctx_ptr is null you have reached the end of the list.
+		when ctx_ptr > ec count the ctx must continue to wait*/
 
 	}while(context_ptr && (context_ptr->count == ec->count));
 
 
+	/*take the last element of the ec and point it to etime next.
+	i.e. join it to the ctx list*/
 	context_pptr->nextcontext = etime.nextcontext;
-	printf("context_pptr->nextcontext pts to %s\n", context_pptr->nextcontext->name);
 
+	if(context_pptr->nextcontext)
+		printf("context_pptr->nextcontext pts to %s\n", context_pptr->nextcontext->name);
+	else
+		printf("context_pptr->nextcontext pts to null");
+
+
+	/*join the list*/
 	etime.nextcontext = ec->nextcontext;
 
 	printf("etime next %s\n", etime.nextcontext->name);
 
-
-	//sets list null
+	/*if their remains some ctx that are waiting on ec link them back
+	if not this will now point to null*/
 	ec->nextcontext = context_ptr;
 	if(!ec->nextcontext)
 		printf("yes ec->contextlist = null\n");
@@ -255,6 +266,7 @@ void pause(count_t count){
 	return;
 }
 
+
 /* save current task on ec, return next task to run */
 void context_find_next(eventcount *ec, count_t value){
 
@@ -267,27 +279,24 @@ void context_find_next(eventcount *ec, count_t value){
 	if ((context_pptr == NULL) || (value < context_pptr->count))
 	{
 
-		assert(curtask);
+		assert(curctx);
 
 		printf("find next ctx null or value low\n");
 
-		//no task or still a task that needs to run
-		//the next one is the current task
-		ec->nextcontext = curtask;
 
-		//and its next task is what we are pointing too
-		curtask->nextcontext = context_pptr;
+		/*the current ec has no ctx link to it
+		or the linked task still needs to run*/
 
-		/*if(!curtask->nextcontext)
-			printf("curtask->contextlist null\n");
+		/*also adds to top of list*/
+		ec->nextcontext = curctx;
 
-		printf("ec %s waiting task %s\n", ec->name, ec->nextcontext->name);*/
+		curctx->nextcontext = context_pptr;
 
 	}
 	else
 	{
 
-		printf("insert into list ctx %s\n", context_pptr->name);
+		printf("insert into ec's ctx list next name %s\n", context_pptr->name);
 
 		context *context_ptr = NULL;
 
@@ -296,19 +305,24 @@ void context_find_next(eventcount *ec, count_t value){
 		printf("ec is ETIME (time list %d)\n", time_list);
 
 		//time list is 1 if this ec is etime
-		if (time_list && hint && (value >= hint->count))
+		if (time_list && ctxhint && (value >= ctxhint->count))
 		{
 			printf("in hint && value\n");
 
-			context_ptr = hint->nextcontext;
-			context_pptr = hint;
+			context_ptr = ctxhint->nextcontext;
+			context_pptr = ctxhint;
 		}
 		else
 		{
 			context_ptr = context_pptr->nextcontext;
-			printf("ptr (%s) = pptr (%s) pptr next (%s)\n", context_ptr->name, context_pptr->name, context_pptr->nextcontext->name);
+
+			if(context_ptr)
+				printf("ptr (%s) = pptr (%s) pptr next (%s)\n", context_ptr->name, context_pptr->name, context_pptr->nextcontext->name);
+			else
+				printf("ctx ptr null\n");
 		}
 
+		int i = 1;
 		//look down the list for an older tasks (i.e. looking for value < ctx count)
 		while (context_ptr && (value >= context_ptr->count))
 		{
@@ -317,70 +331,77 @@ void context_find_next(eventcount *ec, count_t value){
 
 			if(!context_ptr)
 				printf("context_ptr next = null\n");
+
+			printf("entered while %d\n", i);
+			i++;
 		}
 
 
-		if (curtask)
+		//Manipulating the order of the list!!
+		if (curctx)
 		{
-			printf("yes curtask %s\n", curtask->name);
+			printf("yes curtask %s\n", curctx->name);
 
-			context_pptr->nextcontext = curtask;
-			curtask->nextcontext = context_ptr;
+			context_pptr->nextcontext = curctx;
+			curctx->nextcontext = context_ptr;
 
-			if(!curtask->nextcontext)
-				printf("curtask name %s no next element\n", curtask->name);
+			//printf("next next name %s\n", etime.nextcontext->nextcontext->nextcontext->name);
+
+			if(!curctx->nextcontext)
+				printf("curtask name %s no next element\n", curctx->name);
 		}
 
 		//working with etime, thus hint is the curtask
 		if (time_list)
 		{
-			hint = curtask;
+			ctxhint = curctx;
 		}
 	}
 
 
-	//sets when this task should execute next (cycles).
-	curtask->count = value;
+	/*sets when this task should execute next (cycles).
+	this is in conjuntion with the ec it is waiting on.*/
+	curctx->count = value;
 
-	printf("curtask name %s count %llu\n", curtask->name, curtask->count);
+	printf("curtask name %s count %llu\n", curctx->name, curctx->count);
 
 	/*get next task to run*/
 
 	//change curtask to the next task
-	curtask = etime.nextcontext;
+	curctx = etime.nextcontext;
 
 	if(context_pptr)
 		printf("curtask name %s count %llu ctx pptr name %s count %llu nextname %s count %llu\n",
-				curtask->name, curtask->count, context_pptr->name, context_pptr->count, context_pptr->nextcontext->name, context_pptr->nextcontext->count);
+				curctx->name, curctx->count, context_pptr->name, context_pptr->count, context_pptr->nextcontext->name, context_pptr->nextcontext->count);
 	else
-		printf("curtask name %s count %llu ctx pptr null\n", curtask->name, curtask->count);
+		printf("curtask name %s count %llu ctx pptr null\n", curctx->name, curctx->count);
 
-	if (hint == curtask)
+	if (ctxhint == curctx)
 	{
 		printf("hint == curtask\n");
-		hint = NULL;
+		ctxhint = NULL;
 	}
 
 	//if there is no new task exit
-	if (curtask == NULL)
+	if (curctx == NULL)
 	{
 		context_cleanup();
 
 		context_end();
 	}
 
-	//the new task should be something that runs in the future.
-	assert(curtask->count >= etime.count);
+	//the new task should be something that has yet to run.
+	assert(curctx->count >= etime.count);
 
-	//moves etime to oldest ctx in list
-  	etime.nextcontext = curtask->nextcontext;
+	//moves etime to the next ctx in list
+  	etime.nextcontext = curctx->nextcontext;
 
   	if(etime.nextcontext)
-  		printf("etime.nextcontext name %s count %llu\n", etime.nextcontext->name, etime.nextcontext->count);
+  		printf("etime next name %s count %llu etime count %llu\n", etime.nextcontext->name, etime.nextcontext->count, etime.count);
   	else
   		printf("yes etime.next null\n");
 
-  	etime.count = curtask->count; //set etime.count to next ctx's count (why?)
+  	etime.count = curctx->count; //set etime.count to next ctx's count (why?)
 
   	printf("---\n");
   	return;
@@ -403,46 +424,43 @@ context *context_select(void){
 		printf("here2\n");
 
 		//set current task here
-		curtask = etime.nextcontext;
+		curctx = etime.nextcontext;
 
-		if(curtask)
-			printf("curtask name %s\n", curtask->name);
+		if(curctx)
+			printf("curtask name %s\n", curctx->name);
 
-		if (hint == curtask)
+		if (ctxhint == curctx)
 		{
-			hint = NULL;
+			ctxhint = NULL;
 		}
 
-		if (curtask == NULL)
+		if (curctx == NULL)
 		{
 			context_cleanup();
 			context_end();
 		}
 
 		//move down one context
-		etime.nextcontext = curtask->nextcontext;
-		printf("before et count %llu curtask count %llu\n", etime.count, curtask->count);
+		etime.nextcontext = curctx->nextcontext;
+		printf("before et count %llu curtask count %llu\n", etime.count, curctx->count);
 
-		etime.count = curtask->count;
-		printf("after et count %llu curtask count %llu\n", etime.count, curtask->count);
+		etime.count = curctx->count;
+		printf("after et count %llu curtask count %llu\n", etime.count, curctx->count);
 	}
 
 	printf("---\n");
-	return curtask;
+	return curctx;
 }
 
 void context_next(eventcount *ec, count_t value){
 
 	printf("context next\n");
-	context *ctx = NULL;
+
 	last_ec = ec; //these are global because context select doesn't take a variable in
 	last_value = value;
 
 	printf("---\n");
-	ctx = context_select();
-	assert(ctx);
-
-	context_switch(ctx);
+	context_switch(context_select());
 
 	return;
 }
@@ -454,8 +472,11 @@ void await (eventcount *ec, count_t value){
 	/*todo*/
 	/*check for stack overflows*/
 
-	printf("await\n");
+	/*this current context should not await this ec
+	if the ec's count is greator than the provided value*/
 
+	/*for normal ec's the counts are always incremented in their main ctx
+	for etime, the count must be given as current time plus the desired delay*/
 	if (ec->count >= value)
 	{
 		printf("await, count >= value\n");
@@ -464,7 +485,9 @@ void await (eventcount *ec, count_t value){
 		return;
 	}
 
-	printf("await finding next ctx cur ec %s curtask %s value %llu\n", ec->name, curtask->name, value);
+	/*the current context must now wait on this ec to be incremented*/
+
+	printf("await finding next ctx cur ec %s curtask %s value %llu\n", ec->name, curctx->name, value);
 
 	printf("---\n");
 	context_next(ec, value);
@@ -658,3 +681,290 @@ int context_simulate(void){
 #else
 #error Unsupported machine/OS combination
 #endif
+
+
+//DESim Util Stuff
+
+list *desim_list_create(unsigned int size)
+{
+	assert(size > 0);
+
+	list *new_list;
+
+	/* Create vector of elements */
+	new_list = calloc(1, sizeof(list));
+	new_list->size = size < 4 ? 4 : size;
+	new_list->elem = calloc(new_list->size, sizeof(void *));
+
+	/* Return list */
+	return new_list;
+}
+
+
+void desim_list_free(list *list_ptr)
+{
+	free(list_ptr->elem);
+	free(list_ptr);
+	return;
+}
+
+
+int desim_list_count(list *list_ptr)
+{
+	return list_ptr->count;
+}
+
+void desim_list_grow(list *list_ptr)
+{
+	void **nelem;
+	int nsize, i, index;
+
+	/* Create new array */
+	nsize = list_ptr->size * 2;
+	nelem = calloc(nsize, sizeof(void *));
+
+	/* Copy contents to new array */
+	for (i = list_ptr->head, index = 0;
+		index < list_ptr->count;
+		i = (i + 1) % list_ptr->size, index++)
+		nelem[index] = list_ptr->elem[i];
+
+	/* Update fields */
+	free(list_ptr->elem);
+	list_ptr->elem = nelem;
+	list_ptr->size = nsize;
+	list_ptr->head = 0;
+	list_ptr->tail = list_ptr->count;
+}
+
+void desim_list_add(list *list_ptr, void *elem)
+{
+	/* Grow list if necessary */
+	if (list_ptr->count == list_ptr->size)
+		desim_list_grow(list_ptr);
+
+	/* Add element */
+	list_ptr->elem[list_ptr->tail] = elem;
+	list_ptr->tail = (list_ptr->tail + 1) % list_ptr->size;
+	list_ptr->count++;
+
+}
+
+
+int desim_list_index_of(list *list_ptr, void *elem)
+{
+	int pos;
+	int i;
+
+	/* Search element */
+	for (i = 0, pos = list_ptr->head; i < list_ptr->count; i++, pos = (pos + 1) % list_ptr->size)
+	{
+		if (list_ptr->elem[pos] == elem)
+			return i;
+	}
+
+	//not found
+	return -1;
+}
+
+
+void *desim_list_remove_at(list *list_ptr, int index)
+{
+	int shiftcount;
+	int pos;
+	int i;
+	void *elem;
+
+	/* check bounds */
+	if (index < 0 || index >= list_ptr->count)
+		return NULL;
+
+	/* Get element before deleting it */
+	elem = list_ptr->elem[(list_ptr->head + index) % list_ptr->size];
+
+	/* Delete */
+	if (index > list_ptr->count / 2)
+	{
+		shiftcount = list_ptr->count - index - 1;
+		for (i = 0, pos = (list_ptr->head + index) % list_ptr->size; i < shiftcount; i++, pos = (pos + 1) % list_ptr->size)
+			list_ptr->elem[pos] = list_ptr->elem[(pos + 1) % list_ptr->size];
+		list_ptr->elem[pos] = NULL;
+		list_ptr->tail = INLIST(list_ptr->tail - 1);
+	}
+	else
+	{
+		for (i = 0, pos = (list_ptr->head + index) % list_ptr->size; i < index; i++, pos = INLIST(pos - 1))
+			list_ptr->elem[pos] = list_ptr->elem[INLIST(pos - 1)];
+		list_ptr->elem[list_ptr->head] = NULL;
+		list_ptr->head = (list_ptr->head + 1) % list_ptr->size;
+	}
+
+	list_ptr->count--;
+	return elem;
+}
+
+
+void *desim_list_remove(list *list_ptr, void *elem)
+{
+	int index;
+
+	/* Get index of element */
+	index = desim_list_index_of(list_ptr, elem);
+
+	/* Delete element at found position */
+	return desim_list_remove_at(list_ptr, index);
+}
+
+
+void list_clear(struct list_t *list)
+{
+	list->count = 0;
+	list->head = 0;
+	list->tail = 0;
+	return;
+}
+
+void desim_list_push(list *list_ptr, void *elem)
+{
+	desim_list_add(list_ptr, elem);
+}
+
+
+void *desim_list_pop(list *list_ptr)
+{
+	if (!list_ptr->count)
+		return NULL;
+
+	return desim_list_remove_at(list_ptr, list_ptr->count - 1);
+}
+
+void desim_list_enqueue(list *list_ptr, void *elem)
+{
+	desim_list_add(list_ptr, elem);
+}
+
+
+void *desim_list_dequeue(list *list_ptr)
+{
+	if (!list_ptr->count)
+		return NULL;
+
+	return desim_list_remove_at(list_ptr, 0);
+}
+
+
+/*void *list_top(struct list_t *list)
+{
+	if (!list->count)
+	{
+		list->error_code = LIST_ERR_EMPTY;
+		return NULL;
+	}
+	return list_get(list, list->count - 1);
+}*/
+
+
+/*void *list_bottom(struct list_t *list)
+{
+	if (!list->count)
+	{
+		list->error_code = LIST_ERR_EMPTY;
+		return NULL;
+	}
+	return list_get(list, 0);
+}*/
+
+/*void *list_head(struct list_t *list)
+{
+	if (!list->count)
+	{
+		list->error_code = LIST_ERR_EMPTY;
+		return NULL;
+	}
+	return list_get(list, 0);
+}*/
+
+
+/*void *list_tail(struct list_t *list)
+{
+	if (!list->count)
+	{
+		list->error_code = LIST_ERR_EMPTY;
+		return NULL;
+	}
+	return list_get(list, list->count - 1);
+}*/
+
+/*void *list_get(struct list_t *list, int index)
+{
+	 Check bounds
+	if (index < 0 || index >= list->count)
+	{
+		list->error_code = LIST_ERR_BOUNDS;
+		return NULL;
+	}
+
+	 Return element
+	index = (index + list->head) % list->size;
+	list->error_code = LIST_ERR_OK;
+	return list->elem[index];
+}*/
+
+
+/*void list_set(struct list_t *list, int index, void *elem)
+{
+	 check bounds
+	if (index < 0 || index >= list->count)
+	{
+		list->error_code = LIST_ERR_BOUNDS;
+		return;
+	}
+
+	 Return element
+	index = (index + list->head) % list->size;
+	list->elem[index] = elem;
+	list->error_code = LIST_ERR_OK;
+}*/
+
+
+/*void list_insert(struct list_t *list, int index, void *elem)
+{
+	int shiftcount;
+	int pos;
+	int i;
+
+	 Check bounds
+	if (index < 0 || index > list->count)
+	{
+		list->error_code = LIST_ERR_BOUNDS;
+		return;
+	}
+
+	 Grow list if necessary
+	if (list->count == list->size)
+		list_grow(list);
+
+	 Choose whether to shift elements on the right increasing 'tail', or
+	 * shift elements on the left decreasing 'head'.
+	if (index > list->count / 2)
+	{
+		shiftcount = list->count - index;
+		for (i = 0, pos = list->tail;
+			 i < shiftcount;
+			 i++, pos = INLIST(pos - 1))
+			list->elem[pos] = list->elem[INLIST(pos - 1)];
+		list->tail = (list->tail + 1) % list->size;
+	}
+	else
+	{
+		for (i = 0, pos = list->head;
+			 i < index;
+			 i++, pos = (pos + 1) % list->size)
+			list->elem[INLIST(pos - 1)] = list->elem[pos];
+		list->head = INLIST(list->head - 1);
+	}
+
+	list->elem[(list->head + index) % list->size] = elem;
+	list->count++;
+	list->error_code = LIST_ERR_OK;
+}*/
