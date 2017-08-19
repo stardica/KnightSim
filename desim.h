@@ -77,7 +77,7 @@ struct context_t{
 	int id;				/* task id */
 	count_t count;		/* argument to await */
 	context *nextcontext;
-	list *ctxlist;
+	//list *ctxlist;
 	void (*start)(void);	/*entry point*/
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
@@ -88,6 +88,8 @@ typedef int bool;
 enum {false, true};
 
 /* Globals*/
+list *ctxlist;
+
 eventcount etime;
 eventcount *ectail;
 eventcount *last_ec; /* to work with context library */
@@ -99,6 +101,8 @@ context *ctxhint;
 jmp_buf main_context;
 long long ecid; //id for each event count
 count_t last_value;
+
+#define newcode 1
 
 //DESim user level functions
 void desim_init(void);
@@ -140,12 +144,13 @@ void desim_list_enqueue(list *list_ptr, void *elem);
 void *desim_list_dequeue(list *list_ptr);
 void *desim_list_remove_at(list *list_ptr, int index);
 void *desim_list_remove(list *list_ptr, void *elem);
+void desim_list_insert(list *list_ptr, int index, void *elem);
+int desim_list_index_of(list *list_ptr, void *elem);
+void *desim_list_get(list *list, int index);
 
 /*void desim_list_clear(struct list_t *list);
-void *desim_list_get(struct list_t *list, int index);
+void desim_list_set(list *list, int index, void *elem);
 void list_set(struct list_t *list, int index, void *elem);
-void list_insert(struct list_t *list, int index, void *elem);
-int list_index_of(struct list_t *list, void *elem);
 void *list_top(struct list_t *list);
 void *list_bottom(struct list_t *list);
 void *list_head(struct list_t *list);
