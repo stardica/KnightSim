@@ -132,37 +132,25 @@ void context_cleanup(void);
 void context_destroy(context *ctx);
 
 //DESim util stuff
-
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 #define LIST_FOR_EACH(list_ptr, iter) \
 	for ((iter) = 0; (iter) < desim_list_count((list_ptr)); (iter)++)
 #define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
-#define ELEM(X) list_ptr->elem[((X) + list_ptr->head) % list_ptr->size]
 
 list *desim_list_create(unsigned int size);
-void desim_list_free(list *list_ptr);
+void desim_list_insert(list *list_ptr, int index, void *elem);
+void *desim_list_get(list *list_ptr, int index);
 int desim_list_count(list *list_ptr);
-void desim_list_add(list *list_ptr, void *elem);
-void desim_list_grow(list *list_ptr);
-void desim_list_push(list *list_ptr, void *elem);
-void *desim_list_pop(list *list_ptr);
 void desim_list_enqueue(list *list_ptr, void *elem);
 void *desim_list_dequeue(list *list_ptr);
+void desim_list_add(list *list_ptr, void *elem);
+void desim_list_grow(list *list_ptr);
 void *desim_list_remove_at(list *list_ptr, int index);
 void *desim_list_remove(list *list_ptr, void *elem);
-void desim_list_insert(list *list_ptr, int index, void *elem);
 int desim_list_index_of(list *list_ptr, void *elem);
-void *desim_list_get(list *list_ptr, int index);
 void desim_list_clear(list *list_ptr);
-
-/*
-void desim_list_set(list *list, int index, void *elem);
-void list_set(struct list_t *list, int index, void *elem);
-void *list_top(struct list_t *list);
-void *list_bottom(struct list_t *list);
-void *list_head(struct list_t *list);
-void *list_tail(struct list_t *list);*/
+void desim_list_free(list *list_ptr);
 
 #endif /*__DESim_H__*/

@@ -1068,20 +1068,6 @@ void desim_list_clear(list *list_ptr)
 	return;
 }
 
-void desim_list_push(list *list_ptr, void *elem)
-{
-	desim_list_add(list_ptr, elem);
-}
-
-
-void *desim_list_pop(list *list_ptr)
-{
-	if (!list_ptr->count)
-		return NULL;
-
-	return desim_list_remove_at(list_ptr, list_ptr->count - 1);
-}
-
 void desim_list_enqueue(list *list_ptr, void *elem)
 {
 	desim_list_add(list_ptr, elem);
@@ -1097,48 +1083,6 @@ void *desim_list_dequeue(list *list_ptr)
 }
 
 
-/*void *list_top(struct list_t *list)
-{
-	if (!list->count)
-	{
-		list->error_code = LIST_ERR_EMPTY;
-		return NULL;
-	}
-	return list_get(list, list->count - 1);
-}*/
-
-
-/*void *list_bottom(struct list_t *list)
-{
-	if (!list->count)
-	{
-		list->error_code = LIST_ERR_EMPTY;
-		return NULL;
-	}
-	return list_get(list, 0);
-}*/
-
-/*void *list_head(struct list_t *list)
-{
-	if (!list->count)
-	{
-		list->error_code = LIST_ERR_EMPTY;
-		return NULL;
-	}
-	return list_get(list, 0);
-}*/
-
-
-/*void *list_tail(struct list_t *list)
-{
-	if (!list->count)
-	{
-		list->error_code = LIST_ERR_EMPTY;
-		return NULL;
-	}
-	return list_get(list, list->count - 1);
-}*/
-
 void *desim_list_get(list *list_ptr, int index)
 {
 	/*Check bounds*/
@@ -1149,22 +1093,6 @@ void *desim_list_get(list *list_ptr, int index)
 	index = (index + list_ptr->head) % list_ptr->size;
 	return list_ptr->elem[index];
 }
-
-
-/*void list_set(struct list_t *list, int index, void *elem)
-{
-	 check bounds
-	if (index < 0 || index >= list->count)
-	{
-		list->error_code = LIST_ERR_BOUNDS;
-		return;
-	}
-
-	 Return element
-	index = (index + list->head) % list->size;
-	list->elem[index] = elem;
-	list->error_code = LIST_ERR_OK;
-}*/
 
 
 void desim_list_insert(list *list_ptr, int index, void *elem){

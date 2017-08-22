@@ -1,9 +1,9 @@
 #DEsim
 LIB_NAME_64 = "libDESim64.a"
-CC_FLAGS_64 = -g3 -O3 -Wall
+CC_FLAGS_64 = -g3 -O3 -Wall -Werror
 
 LIB_NAME_32 = "libDESim32.a"
-CC_FLAGS_32 = -g3 -O3 -Wall -m32
+CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32 
 
 CC = gcc
 
