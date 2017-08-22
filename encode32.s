@@ -1,10 +1,3 @@
-/*
- * encode32.s
- *
- *  Created on: Aug 11, 2017
- *      Author: stardica
- */
-
 .section .text
 .globl encode32
 .type encode32, @function

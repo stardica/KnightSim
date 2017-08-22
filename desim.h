@@ -5,7 +5,6 @@
 #define DEFAULT_STACK_SIZE 32768
 #endif
 
-#define TASKING_MAGIC_NUMBER 0x5a5a5a5a
 #define STK_OVFL_MAGIC 0x12349876 /* stack overflow check */
 
 #ifdef TIME_64
@@ -46,9 +45,9 @@ int decode32(int val);
 #error Unsupported machine/OS combination
 #endif
 
-typedef Time_t count_t;
+typedef Time_t count;
 typedef struct context_t context;
-typedef struct eventcount_s eventcount;
+typedef struct eventcount_t eventcount;
 typedef struct list_t list;
 
 struct list_t{
@@ -61,13 +60,11 @@ struct list_t{
 };
 
 //Eventcount objects
-struct eventcount_s{
+struct eventcount_t{
 	char * name;		/* string name of event count */
 	long long id;
-	context *nextcontext;
 	list *ctxlist;
-	count_t count;		/* current value of event */
-	eventcount *nextec; /* pointer to eclist head */
+	count count;		/* current value of event */
 };
 
 //Context objects
@@ -75,9 +72,7 @@ struct context_t{
 	jmp_buf buf;		/*state */
 	char *name;			/* task name */
 	int id;				/* task id */
-	count_t count;		/* argument to await */
-	context *nextcontext;
-	//list *ctxlist;
+	count count;		/* argument to await */
 	void (*start)(void);	/*entry point*/
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
@@ -89,6 +84,7 @@ enum {false, true};
 
 /* Globals*/
 list *ctxlist;
+list *eclist;
 
 eventcount etime;
 eventcount *ectail;
@@ -100,7 +96,7 @@ context *curctx;
 context *ctxhint;
 jmp_buf main_context;
 long long ecid; //id for each event count
-count_t last_value;
+count last_value;
 
 #define newcode 1
 
@@ -110,26 +106,24 @@ eventcount *eventcount_create(char *name);
 void context_create(void (*func)(void), unsigned stacksize, char *name);
 
 void simulate(void);
-void pause(count_t);
-void await(eventcount *ec, count_t value);
+void pause(count value);
+void await(eventcount *ec, count value);
 void advance(eventcount *ec);
-void advance_2(eventcount *ec);
 
-void eventcount_init(eventcount * ec, count_t count, char *ecname);
+void eventcount_init(eventcount * ec, count count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
 void context_stub(void);
-void context_next(eventcount *ec, count_t value);
-void context_remove_last(context *last_context);
-void context_find_next(eventcount *ec, count_t value);
-void context_find_next_2(eventcount *ec, count_t value);
+void context_next(eventcount *ec, count value);
+void context_find_next(eventcount *ec, count value);
 int context_simulate(void);
 void context_end(void);
 context *context_select(void);
-void context_switch(context *ctx);
+void context_switch(context *ctx_ptr);
 void context_exit(void);
-void context_cleanup(void);
-void context_destroy(context *ctx);
+void context_destroy(context *ctx_ptr);
+void desim_end(void);
+
 
 //DESim util stuff
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));

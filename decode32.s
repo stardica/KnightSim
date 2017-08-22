@@ -1,10 +1,3 @@
-/*
- * decode32.s
- *
- *  Created on: Aug 11, 2017
- *      Author: stardica
- */
-
 .section .text
 .globl decode32
 .type decode32, @function

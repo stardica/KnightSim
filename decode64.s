@@ -1,10 +1,3 @@
-/*
- * decode64.s
- *
- *  Created on: Aug 11, 2017
- *      Author: stardica
- */
-
 .section .text
 .globl decode64
 .type decode64, @function
