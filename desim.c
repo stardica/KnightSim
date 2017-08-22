@@ -1,3 +1,5 @@
+#include "desim.h"
+
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -5,7 +7,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "desim.h"
 
 list *ctxlist = NULL;
 list *eclist = NULL;
@@ -77,7 +78,6 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 	new_context_ptr->stacksize = stacksize;
 	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
 	new_context_ptr->start = func; /*assigns the head of a function*/
-
 
 	context_init(new_context_ptr);
 
@@ -308,8 +308,6 @@ void context_find_next(eventcount *ec, count value){
 }
 
 
-
-
 context *context_select(void){
 
 	printf("context_select\n");
@@ -406,6 +404,7 @@ void simulate(void){
 	return;
 }
 
+
 void desim_end(void){
 
 	int i = 0;
@@ -423,7 +422,6 @@ void desim_end(void){
 
 	return;
 }
-
 
 
 void context_stub(void){
@@ -453,30 +451,18 @@ void context_stub(void){
 
 
 
-void context_exit (void){
-
-  terminated_context = current_context;
-  context_switch (context_select());
-  return;
-}
-
-
 #if defined(__linux__) && defined(__i386__)
 
-void context_switch (context *ctx)
+void context_switch (context *ctx_ptr)
 {
 
 	if (!current_context || !setjmp32_2(current_context->buf))
 	{
-	  current_context = ctx;
-	  longjmp32_2(ctx->buf, 1);
-	}
-	if (terminated_context)
-	{
-	  context_destroy (terminated_context);
-	  terminated_context = NULL;
+	  current_context = ctx_ptr;
+	  longjmp32_2(ctx_ptr->buf, 1);
 	}
 
+	return;
 }
 
 void context_init (context *new_context){
@@ -511,12 +497,6 @@ void context_switch (context *ctx_ptr){
 
 		current_context = ctx_ptr;
 		longjmp64_2(ctx_ptr->buf, 1);
-	}
-
-	if (terminated_context)
-	{
-		context_destroy(terminated_context);
-		terminated_context = NULL;
 	}
 
 	return;
