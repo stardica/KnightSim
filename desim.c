@@ -484,9 +484,13 @@ int context_simulate(void){
 
 #elif defined(__linux__) && defined(__x86_64)
 
+int i = 0;
+
 void context_switch (context *ctx_ptr){
 
 	printf("context_switch");
+
+
 
 	//setjmp returns 1 if jumping to this position via longjmp
 	if (!current_context || !setjmp64_2(current_context->buf))
@@ -495,8 +499,10 @@ void context_switch (context *ctx_ptr){
 		note that the jump is to the next context and the
 		setjmp is for the current context*/
 
+		i++;
+
 		current_context = ctx_ptr;
-		longjmp64_2(ctx_ptr->buf, 1);
+		longjmp64_2(ctx_ptr->buf, 7);
 	}
 
 	return;

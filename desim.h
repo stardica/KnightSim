@@ -106,9 +106,9 @@ eventcount *eventcount_create(char *name);
 void context_create(void (*func)(void), unsigned stacksize, char *name);
 
 void simulate(void);
-void pause(count value);
 void await(eventcount *ec, count value);
 void advance(eventcount *ec);
+void pause(count value);
 
 void eventcount_init(eventcount * ec, count count, char *ecname);
 void eventcount_destroy(eventcount *ec);
