@@ -82,6 +82,8 @@ struct context_t{
 typedef int bool;
 enum {false, true};
 
+#define CYCLE etime.count
+
 /* Globals*/
 list *ctxlist;
 list *eclist;
@@ -123,6 +125,7 @@ void context_switch(context *ctx_ptr);
 void context_exit(void);
 void context_destroy(context *ctx_ptr);
 void desim_end(void);
+
 
 
 //DESim util stuff
