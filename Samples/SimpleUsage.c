@@ -12,7 +12,7 @@ void context2(void);
 void context3(void);
 
 int done = 0;
-int loop = 2;
+int loop = 1;
 
 int main(void){
 

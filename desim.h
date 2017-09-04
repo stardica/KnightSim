@@ -100,8 +100,6 @@ jmp_buf main_context;
 long long ecid; //id for each event count
 count last_value;
 
-#define newcode 1
-
 //DESim user level functions
 void desim_init(void);
 eventcount *eventcount_create(char *name);

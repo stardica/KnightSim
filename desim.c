@@ -140,6 +140,7 @@ void advance(eventcount *ec){
 		if(context_ptr)
 		{
 			/*printf("what did i get? %s\n", context_ptr->name);*/
+			context_ptr->count = etime.count;
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
 
