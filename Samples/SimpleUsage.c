@@ -86,7 +86,7 @@ void context2(void){
 
 	int h = 0;
 	int i = 0;
-	int j = 1;
+	//int j = 1;
 	int k = 1;
 
 	printf("context2 init\n");
@@ -105,9 +105,13 @@ void context2(void){
 			printf("context2 advance e2 cycle %llu\n", CYCLE);
 			advance(e2);
 
-			printf("context2 await e3 cycle %llu\n", CYCLE);
+			/*printf("context2 await e3 cycle %llu\n", CYCLE);
 			await(e3, j);
 			j++;
+			printf("context2 resuming cycle %llu\n", CYCLE);*/
+
+			printf("context2 pausing cycle %llu\n", CYCLE);
+			pause(2);
 			printf("context2 resuming cycle %llu\n", CYCLE);
 
 			i++;
