@@ -7,41 +7,34 @@
 #include <assert.h>
 #include <string.h>
 
-
+list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
 list *eclist = NULL;
 
-context initctx;
-context *curctx = &initctx;
+context *curctx = NULL;
 context *ctxhint = NULL;
-eventcount etime;
-eventcount *ectail = NULL;
-eventcount *last_ec = NULL; /* to work with context library */
+eventcount *etime = NULL;
+
 long long ecid = 0;
-count last_value = 0;
+
 context *current_context = NULL;
 context *terminated_context = NULL;
 
 
 void desim_init(void){
 
-	//set up etime
-	etime.name = strdup("etime");
-	etime.id = 0;
-	etime.count = 0;
-	etime.ctxlist = desim_list_create(4);
-
-	//set up initial task
-	initctx.name = strdup("init ctx");
-	initctx.count = 0;
-	initctx.start = NULL;
-	initctx.id = -1;
-	initctx.magic = STK_OVFL_MAGIC;
-	//initctx.ctxlist = desim_list_create(4);
+	char buff[100];
 
 	//other globals
+	ctxdestroylist = desim_list_create(4);
 	ctxlist = desim_list_create(4);
 	eclist = desim_list_create(4);
+
+	//set up etime
+	memset(buff,'\0' , 100);
+	snprintf(buff, 100, "etime");
+	etime = eventcount_create(strdup(buff));
+
 
 	return;
 }
@@ -71,7 +64,7 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 	new_context_ptr = (context *) malloc(sizeof(context));
 	assert(new_context_ptr);
 
-	new_context_ptr->count = etime.count;
+	new_context_ptr->count = etime->count;
 	new_context_ptr->name = name;
 	new_context_ptr->stack = (char *)malloc(stacksize);
 	assert(new_context_ptr->stack);
@@ -83,6 +76,9 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	//put the new ctx in the global ctx list
 	desim_list_insert(ctxlist, 0, new_context_ptr);
+
+	//for destroying the context later
+	desim_list_insert(ctxdestroylist, 0, new_context_ptr);
 
 	return;
 }
@@ -106,12 +102,6 @@ void advance(eventcount *ec){
 	context_ptr = desim_list_get(ec->ctxlist, 0);
 
 	/* check for no tasks being enabled */
-	//printf("ec name %s value %llu\n", ec->name, ec->count);
-
-	/*if(!context_ptr)
-		printf("no ctx yet\n");
-	else
-		printf("ec %s val %llu ctx %s val %llu\n", ec->name, ec->count, context_ptr->name, context_ptr->count);*/
 
 	/*compare waiting ctx to current ctx
 	and if the waiting ctx is ready continue
@@ -122,38 +112,25 @@ void advance(eventcount *ec){
 		/*no ctx waiting on this event count or
 		the currently awaiting ctx is older*/
 
-		/*printf("advance returning ctx null\n");
-		printf("----\n");*/
 		return;
 	}
 
-	/*if here, there is a ctx(s) waiting on this ec AND its ready to run ready to run*/
-
-	/*find the end of the ec's task list
-	and set all ctx time to current time (etime.cout)*/
-
-	/*int i = 0;
-	printf("inserting into ctxlist list size %d\n", desim_list_count(ec->ctxlist));*/
+	/*if here, there is a ctx(s) waiting on this ec AND
+	 * its ready to run ready to run
+	 * find the end of the ec's task list
+	 * and set all ctx time to current time (etime.cout)*/
 	do
 	{
 		context_ptr = desim_list_dequeue(ec->ctxlist);
 		if(context_ptr)
 		{
 			/*printf("what did i get? %s\n", context_ptr->name);*/
-			context_ptr->count = etime.count;
+			context_ptr->count = etime->count;
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
 
 	}while(context_ptr && (context_ptr->count == ec->count));
 
-	/*LIST_FOR_EACH(ctxlist, i)
-	{
-		context_ptr = desim_list_get(ctxlist, i);
-		if(context_ptr)
-			printf("ctxlist item name %s\n", context_ptr->name);
-	}*/
-
-	/*printf("----\n");*/
 	return;
 }
 
@@ -163,6 +140,8 @@ void context_destroy(context *ctx_ptr){
 	printf("destroying %s\n", ctx_ptr->name);
 	free(ctx_ptr->name);
 	free(ctx_ptr->stack);
+	ctx_ptr->start = NULL;
+	free(ctx_ptr);
 	ctx_ptr = NULL;
 
 	return;
@@ -184,14 +163,12 @@ void eventcount_destroy(eventcount *ec_ptr){
 
 void pause(count value){
 
-	await(&etime, etime.count + value);
+	await(etime, etime->count + value);
+
 	return;
 }
 
-void context_find_next(eventcount *ec, count value){
-
-	/*printf("context_find_next_2\n");*/
-	/*int i = 0;*/
+context *context_select(eventcount *ec, count value){
 
 	/*we are here because of an await
 	stop the currect context and drop it into
@@ -199,9 +176,9 @@ void context_find_next(eventcount *ec, count value){
 
 	/*determine if the ec has another context
 	in its awaiting ctx list*/
-	bool isetime = (ec == &etime);
 	context *context_ptr = NULL;
 	context_ptr = desim_list_get(ec->ctxlist, 0);
+	int i = 0;
 
 	if((context_ptr == NULL) || (value < context_ptr->count))
 	{
@@ -209,8 +186,6 @@ void context_find_next(eventcount *ec, count value){
 		or an awaiting ctx is older and can run
 		after the current ctx (i.e. doesn't matter
 		when they execute)*/
-
-		/*printf("ec (etime %d) has no awaiting ctx or an awaiting ctx is older than this ctx\n", isetime);*/
 		assert(curctx);
 
 		/*get the current ctx*/
@@ -220,170 +195,92 @@ void context_find_next(eventcount *ec, count value){
 		/*put at head of ec's ctx list*/
 		desim_list_insert(ec->ctxlist, 0, curctx);
 
-		/*note, the list is self ordering on a cycle by
-		cycle basis*/
-		/*context_ptr = desim_list_get(ec->ctxlist, 0);
-		printf("global ctx list size %d\n", desim_list_count(ctxlist));
-		printf("ec list size %d name %s\n", desim_list_count(ec->ctxlist), context_ptr->name);
-		exit(0);*/
-		/*LIST_FOR_EACH(ctxlist, i)
-		{
-			context_ptr = desim_list_get(ctxlist, i);
-			if(context_ptr)
-				printf("ctxlist item name %s\n", context_ptr->name);
-		}*/
-
-
 	}
 	else
 	{
 
-		fatal("ec/etime has more than one ctx inserted into ctx list\n");
-
-		/*if here there is a ctx in the ec's ctx list that should run after
-		the current ctx resumes. This occurs mostly when using pause
-		from in a ctx that controls the actual simulated cycle count (etime)
-		this can also occur is two seperate ctxs are awaiting the same ec
-		and one is set to wait longer than the other*/
+		//we should have a ctx and its value should be less than the current value
 		assert(context_ptr);
 
-		printf("insert into ec's ctx list name %s\n", context_ptr->name);
 
-		 //determines if this is etime or not.
+		/*if here, there is one or more ctx with a lower or equal count to this one.
+		The list must be kept in count order, so go down the list until you find
+		a spot to insert this ctx. if the count is equal keep going too.*/
 
-		/*--------------------------*/
-		printf("isetime? %d\n", isetime);
+		/*we already know that the first element's count is lower
+		so start with the next element and go down the list until you
+		find an element with a larger count*/
+		LIST_FOR_EACH(ec->ctxlist, i, 1)
+		{
+ 			context_ptr = desim_list_get(ec->ctxlist, i);
+			if(context_ptr && context_ptr->count > value)
+			{
+				break;
+			}
+		}
+
+		if(context_ptr)
+		{
+			//the next ctx is the largest insert before it
+			context_ptr = desim_list_dequeue(ctxlist);
+			desim_list_insert(ec->ctxlist, i, context_ptr);
+		}
+		else
+		{
+			//insert at end of list
+			context_ptr = desim_list_dequeue(ctxlist);
+			desim_list_enqueue(ec->ctxlist, context_ptr);
+		}
+
 	}
 
 	/*sets when this task should execute next (cycles).
 	this is in conjunction with the ec it is waiting on.*/
 	curctx->count = value;
-	/*printf("curtask name %s count %llu\n", curctx->name, curctx->count);*/
 
-
-	/*get next task to run*/
+	/*get next ctx to run*/
 	curctx = desim_list_get(ctxlist, 0);
-	//if no curctx all tasks are awaiting, this is a simulation implementation problem
 
 	if(!curctx)
 	{
-		context_ptr = desim_list_dequeue(etime.ctxlist);
-		assert(context_ptr);
+		curctx = desim_list_dequeue(etime->ctxlist);
 
-		/*printf("ctxlist empty! inserting from etime name %s count %llu\n", context_ptr->name, context_ptr->count);*/
-
-		curctx = context_ptr;
-		/*put at head of ec's ctx list*/
-		desim_list_insert(ctxlist, 0, context_ptr);
-
-		/*LIST_FOR_EACH(ctxlist, i)
+		//if no curctx all tasks are awaiting, this is a simulation implementation problem
+		if(!curctx)
 		{
-			context_ptr = desim_list_get(ctxlist, i);
-			if(context_ptr)
-				printf("ctxlist item name %s\n", context_ptr->name);
-		}*/
-	}
-
-	/*printf("NEW curctx name %s count %llu\n", curctx->name, curctx->count);*/
-
-	if (ctxhint == curctx)
-	{
-		/*printf("hint == curtask\n");*/
-		ctxhint = NULL;
-	}
-
-	//if there is no new task exit
-	if (curctx == NULL)
-	{
-		context_end();
-	}
-
-	//the new task should be something that has yet to run.
-	//assert(curctx->count >= etime.count);
-
-	//moves etime to the next ctx in list
-  	etime.count = curctx->count; //set etime.count to next ctx's count (why?)
-
-  	/*printf("---\n");*/
-	return;
-}
-
-
-context *context_select(void){
-
-	/*printf("context_select\n");*/
-
-	if (last_ec)
-	{
-		context_find_next(last_ec, last_value);
-		last_ec = NULL;
-	}
-	else
-	{
-		/*printf("here2\n");*/
-
-		//set current task here
-		curctx = desim_list_get(ctxlist, 0);
+			fatal("DESim: all contexts are in an await state.\n"
+					"There is a problem with the simulation implementation.\n"
+					"need to implement sim_end here\n");
+		}
 		assert(curctx);
 
-		/*if(curctx)
-			printf("curtask name %s\n", curctx->name);*/
-
-		if (ctxhint == curctx)
-		{
-			ctxhint = NULL;
-		}
-
-		etime.count = curctx->count;
+		/*put at head of ec's ctx list*/
+		desim_list_insert(ctxlist, 0, curctx);
 	}
 
-	/*printf("---\n");*/
+	//moves etime to the next ctx in list
+  	etime->count = curctx->count; //set etime.count to next ctx's count (why?)
+
 	return curctx;
 }
 
-void context_next(eventcount *ec, count value){
-
-	/*printf("context next\n")*/;
-
-	last_ec = ec; //these are global because context select doesn't take a variable in
-	last_value = value;
-
-	/*printf("---\n");*/
-	context_switch(context_select());
-
-	return;
-}
-
-/* await(ec, value) -- suspend until ec.c >= value. */
-void await (eventcount *ec, count value){
+void await(eventcount *ec, count value){
 
 	/*todo*/
 	/*check for stack overflows*/
+	assert(ec);
 
-	/*this current context should not await this ec
-	if the ec's count is greator than the provided value*/
-
-	/*for normal ec's the counts are always incremented in their main ctx
-	for etime, the count must be given as current time plus the desired delay*/
+	/*continue if the ctx's count is less
+	 * than or equal to the ec's count*/
 	if (ec->count >= value)
-	{
-		/*printf("await, count >= value\n");
-
-		printf("---\n");*/
 		return;
-	}
 
 	/*the current context must now wait on this ec to be incremented*/
 
-	/*printf("await finding next ctx cur ec %s curtask %s value %llu\n", ec->name, curctx->name, value);
+	context_switch(context_select(ec, value));
 
-	printf("---\n");*/
-	context_next(ec, value);
-
-	/*printf("---\n");*/
 	return;
 }
-
 
 
 void simulate(void){
@@ -391,12 +288,15 @@ void simulate(void){
 	//simulate
 	if(!context_simulate())
 	{
-		context *next_context = NULL;
+		/*This is the beginning of the simulation
+		 * get the first ctx and run it*/
+		curctx = desim_list_get(ctxlist, 0);
+		assert(curctx);
 
-		next_context = context_select();
-		assert(next_context);
+		etime->count = curctx->count;
 
-		context_switch(next_context);
+		//context_switch(next_context);
+		context_switch(curctx);
 	}
 
 	//clean up
@@ -410,16 +310,32 @@ void desim_end(void){
 
 	int i = 0;
 	eventcount *ec_ptr = NULL;
+	context *ctx_ptr = NULL;
 
-	LIST_FOR_EACH(eclist, i)
+	LIST_FOR_EACH(eclist, i, 0)
 	{
 		ec_ptr = desim_list_get(eclist, i);
-		eventcount_destroy(ec_ptr);
+
+		if(ec_ptr)
+			eventcount_destroy(ec_ptr);
 	}
+
+	LIST_FOR_EACH(ctxdestroylist, i, 0)
+	{
+		ctx_ptr = desim_list_get(ctxdestroylist, i);
+
+		if(ctx_ptr)
+			context_destroy(ctx_ptr);
+	}
+
+	desim_list_clear(ctxdestroylist);
+	desim_list_free(ctxdestroylist);
 
 	desim_list_clear(ctxlist);
 	desim_list_free(ctxlist);
-	ctxlist = NULL;
+
+	desim_list_clear(eclist);
+	desim_list_free(eclist);
 
 	return;
 }
@@ -427,24 +343,17 @@ void desim_end(void){
 
 void context_stub(void){
 
-  /*printf("context stub\n");*/
-
   if(terminated_context)
   {
     context_destroy (terminated_context);
     terminated_context = NULL;
   }
 
-
-  /*printf("----\n");*/
   (*current_context->start)();
 
   /*if current current ctx returns i.e. hits the bottom of its function
-  it will return here. Then we need to terminate the process*/
+  it will return here. Then we need to terminate the simulation*/
 
-  /*printf("context stub exiting\n");*/
-
-  /*clear the ctx list*/
   context_end();
 
   return;
@@ -485,12 +394,7 @@ int context_simulate(void){
 
 #elif defined(__linux__) && defined(__x86_64)
 
-/*int i = 0;*/
-
 void context_switch (context *ctx_ptr){
-
-	/*printf("context_switch");*/
-
 
 	//setjmp returns 1 if jumping to this position via longjmp
 	if (!current_context || !setjmp64_2(current_context->buf))
@@ -498,8 +402,6 @@ void context_switch (context *ctx_ptr){
 		/*ok, this is deep wizardry....
 		note that the jump is to the next context and the
 		setjmp is for the current context*/
-
-		/*i++;*/
 
 		current_context = ctx_ptr;
 		longjmp64_2(ctx_ptr->buf, 7);
@@ -513,7 +415,6 @@ void context_init(context *new_context){
 
 	/*these are in this function because they are architecture dependent.
 	don't move these out of this function!!!!*/
-
 	new_context->buf[7] = (long long)context_stub; /*where the initial jump will go to*/
 	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4); /*points to top of the virtual stack*/
 	return;

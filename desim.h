@@ -82,56 +82,51 @@ struct context_t{
 typedef int bool;
 enum {false, true};
 
-#define CYCLE etime.count
+#define CYCLE etime->count
 
 /* Globals*/
+list *ctxdestroylist;
 list *ctxlist;
 list *eclist;
 
-eventcount etime;
-eventcount *ectail;
-eventcount *last_ec; /* to work with context library */
+eventcount *etime;
 context *current_context;
 context *terminated_context;
-context initctx;
 context *curctx;
-context *ctxhint;
+
 jmp_buf main_context;
 long long ecid; //id for each event count
-count last_value;
 
 //DESim user level functions
 void desim_init(void);
 eventcount *eventcount_create(char *name);
 void context_create(void (*func)(void), unsigned stacksize, char *name);
-
 void simulate(void);
 void await(eventcount *ec, count value);
 void advance(eventcount *ec);
 void pause(count value);
 
+
+//DESim private functions
 void eventcount_init(eventcount * ec, count count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
 void context_stub(void);
-void context_next(eventcount *ec, count value);
-void context_find_next(eventcount *ec, count value);
 int context_simulate(void);
 void context_end(void);
-context *context_select(void);
+context *context_select(eventcount *ec, count value);
 void context_switch(context *ctx_ptr);
-void context_exit(void);
 void context_destroy(context *ctx_ptr);
 void desim_end(void);
-
 
 
 //DESim util stuff
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
-#define LIST_FOR_EACH(list_ptr, iter) \
-	for ((iter) = 0; (iter) < desim_list_count((list_ptr)); (iter)++)
+#define LIST_FOR_EACH(list_ptr, iter, iter_start_value) \
+	for ((iter) = iter_start_value; (iter) < desim_list_count((list_ptr)); (iter)++)
+
 #define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
 
 list *desim_list_create(unsigned int size);

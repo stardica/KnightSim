@@ -71,7 +71,7 @@ void context1(void){
 		advance(e1);
 
 		printf("context1 pausing cycle %llu\n", CYCLE);
-		pause(10);
+		pause(5);
 		printf("context1 resuming cycle %llu\n", CYCLE);
 
 	}while(!done);
@@ -80,6 +80,7 @@ void context1(void){
 
 	return;
 }
+
 
 
 void context2(void){
@@ -111,7 +112,7 @@ void context2(void){
 			printf("context2 resuming cycle %llu\n", CYCLE);*/
 
 			printf("context2 pausing cycle %llu\n", CYCLE);
-			pause(2);
+			pause(10);
 			printf("context2 resuming cycle %llu\n", CYCLE);
 
 			i++;
@@ -142,8 +143,8 @@ void context3(void){
 		i++;
 		printf("context3 resuming cycle %llu\n", CYCLE);
 
-		printf("context3 advance e3 cycle %llu\n", CYCLE);
-		advance(e3);
+		//printf("context3 advance e3 cycle %llu\n", CYCLE);
+		//advance(e3);
 
 	}while(1);
 
