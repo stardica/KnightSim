@@ -114,7 +114,7 @@ void context_init(context *new_context);
 void context_stub(void);
 int context_simulate(void);
 void context_end(void);
-context *context_select(eventcount *ec, count value);
+context *context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
 void desim_end(void);

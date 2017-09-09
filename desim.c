@@ -94,6 +94,8 @@ void eventcount_init(eventcount * ec, count count, char *ecname){
 
 void advance(eventcount *ec){
 
+	int i = 0;
+
 	/* advance the ec's count */
 	ec->count++;
 
@@ -101,17 +103,11 @@ void advance(eventcount *ec){
 	context *context_ptr = NULL;
 	context_ptr = desim_list_get(ec->ctxlist, 0);
 
-	/* check for no tasks being enabled */
-
-	/*compare waiting ctx to current ctx
-	and if the waiting ctx is ready continue
-	if the ctx's count is greater than the ec's count
-	the ctx must continue to wait*/
-	if ((context_ptr == NULL) || (context_ptr->count > ec->count))
+	/*check if there are any ctxs awaiting this ec's advance*/
+	if((context_ptr == NULL) || (context_ptr->count > ec->count))
 	{
 		/*no ctx waiting on this event count or
 		the currently awaiting ctx is older*/
-
 		return;
 	}
 
@@ -119,17 +115,21 @@ void advance(eventcount *ec){
 	 * its ready to run ready to run
 	 * find the end of the ec's task list
 	 * and set all ctx time to current time (etime.cout)*/
-	do
+	LIST_FOR_EACH(ec->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_dequeue(ec->ctxlist);
-		if(context_ptr)
+		context_ptr = desim_list_get(ec->ctxlist, i);
+		if(context_ptr && (context_ptr->count <= ec->count))
 		{
-			/*printf("what did i get? %s\n", context_ptr->name);*/
+			assert(context_ptr->count == ec->count);
 			context_ptr->count = etime->count;
+			context_ptr = desim_list_dequeue(ec->ctxlist);
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
-
-	}while(context_ptr && (context_ptr->count == ec->count));
+		else
+		{
+			break;
+		}
+	}
 
 	return;
 }
@@ -168,7 +168,51 @@ void pause(count value){
 	return;
 }
 
-context *context_select(eventcount *ec, count value){
+context *context_select(void){
+
+	/*get next ctx to run*/
+	curctx = desim_list_get(ctxlist, 0);
+
+	if(!curctx)
+	{
+		/*if there isn't a ctx on the global context list
+		we are ready to advance in cycles, pull from etime*/
+		curctx = desim_list_dequeue(etime->ctxlist);
+
+		/*if there isn't a ctx in etime's ctx list the simulation is
+		deadlocked this is a user simulation implementation problem*/
+		if(!curctx)
+		{
+			/*todo*/
+			/*exit gracefully*/
+			fatal("DESim: deadlock detected ... all contexts are in an await state.\n"
+					"There is a problem with the simulation implementation.\n");
+		}
+
+		assert(curctx);
+
+		/*put at head of ec's ctx list*/
+		desim_list_insert(ctxlist, 0, curctx);
+	}
+
+	//etime is now the current cycle count determined by the ctx's count
+  	etime->count = curctx->count;
+
+  	return curctx;
+}
+
+void await(eventcount *ec, count value){
+
+	/*todo*/
+	/*check for stack overflows*/
+	assert(ec);
+
+	/*continue if the ctx's count is less
+	 * than or equal to the ec's count*/
+	if (ec->count >= value)
+		return;
+
+	/*the current context must now wait on this ec to be incremented*/
 
 	/*we are here because of an await
 	stop the currect context and drop it into
@@ -198,10 +242,8 @@ context *context_select(eventcount *ec, count value){
 	}
 	else
 	{
-
 		//we should have a ctx and its value should be less than the current value
 		assert(context_ptr);
-
 
 		/*if here, there is one or more ctx with a lower or equal count to this one.
 		The list must be kept in count order, so go down the list until you find
@@ -221,63 +263,24 @@ context *context_select(eventcount *ec, count value){
 
 		if(context_ptr)
 		{
-			//the next ctx is the largest insert before it
+			//the next ctx's count is larger insert before before
 			context_ptr = desim_list_dequeue(ctxlist);
 			desim_list_insert(ec->ctxlist, i, context_ptr);
 		}
 		else
 		{
-			//insert at end of list
+			//never found any ctx with a larger count so insert at end
 			context_ptr = desim_list_dequeue(ctxlist);
 			desim_list_enqueue(ec->ctxlist, context_ptr);
 		}
-
 	}
 
-	/*sets when this task should execute next (cycles).
+	/*the curctx pointer still points to this ctx
+	sets when this task should execute next (cycles).
 	this is in conjunction with the ec it is waiting on.*/
 	curctx->count = value;
 
-	/*get next ctx to run*/
-	curctx = desim_list_get(ctxlist, 0);
-
-	if(!curctx)
-	{
-		curctx = desim_list_dequeue(etime->ctxlist);
-
-		//if no curctx all tasks are awaiting, this is a simulation implementation problem
-		if(!curctx)
-		{
-			fatal("DESim: all contexts are in an await state.\n"
-					"There is a problem with the simulation implementation.\n"
-					"need to implement sim_end here\n");
-		}
-		assert(curctx);
-
-		/*put at head of ec's ctx list*/
-		desim_list_insert(ctxlist, 0, curctx);
-	}
-
-	//moves etime to the next ctx in list
-  	etime->count = curctx->count; //set etime.count to next ctx's count (why?)
-
-	return curctx;
-}
-
-void await(eventcount *ec, count value){
-
-	/*todo*/
-	/*check for stack overflows*/
-	assert(ec);
-
-	/*continue if the ctx's count is less
-	 * than or equal to the ec's count*/
-	if (ec->count >= value)
-		return;
-
-	/*the current context must now wait on this ec to be incremented*/
-
-	context_switch(context_select(ec, value));
+	context_switch(context_select());
 
 	return;
 }
@@ -290,13 +293,7 @@ void simulate(void){
 	{
 		/*This is the beginning of the simulation
 		 * get the first ctx and run it*/
-		curctx = desim_list_get(ctxlist, 0);
-		assert(curctx);
-
-		etime->count = curctx->count;
-
-		//context_switch(next_context);
-		context_switch(curctx);
+		context_switch(context_select());
 	}
 
 	//clean up
