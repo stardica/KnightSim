@@ -18,10 +18,12 @@ all: samples64 samples32
 
 samples64: DESim64
 		$(CC) $(CC_FLAGS_64) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer64 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
+		$(CC) $(CC_FLAGS_64) ./Samples/Arbiter.c -o ./Samples/Arbiter64 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
 		@echo "Built $@ successfully"
 				
 samples32: DESim32
 		$(CC) $(CC_FLAGS_32) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer32 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
+		$(CC) $(CC_FLAGS_32) ./Samples/Arbiter.c -o ./Samples/Arbiter32 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
 		@echo "Built $@ successfully"
 		
 
@@ -70,4 +72,4 @@ encode32.o: encode32.s
 	$(CC) $(CC_FLAGS_32) encode32.s -c
 	
 clean:
-	rm -f *.o *.a ./Samples/ProducerConsumer64 ./Samples/ProducerConsumer32
+	rm -f *.o *.a ./Samples/ProducerConsumer64 ./Samples/ProducerConsumer32 ./Samples/Arbiter64 ./Samples/Arbiter32

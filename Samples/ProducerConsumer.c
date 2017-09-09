@@ -6,7 +6,6 @@
 #define LOOP 3
 #define LATENCY 4
 
-
 eventcount *ec_p;
 eventcount *ec_c;
 
@@ -19,7 +18,6 @@ int main(void){
 
 	//user must initialize DESim
 	desim_init();
-
 
 	//create the user defined eventcounts
 	memset(buff,'\0' , 100);
