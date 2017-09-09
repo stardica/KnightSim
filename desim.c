@@ -9,7 +9,7 @@
 
 list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
-list *eclist = NULL;
+list *ecdestroylist = NULL;
 
 context *curctx = NULL;
 context *ctxhint = NULL;
@@ -28,7 +28,7 @@ void desim_init(void){
 	//other globals
 	ctxdestroylist = desim_list_create(4);
 	ctxlist = desim_list_create(4);
-	eclist = desim_list_create(4);
+	ecdestroylist = desim_list_create(4);
 
 	//set up etime
 	memset(buff,'\0' , 100);
@@ -48,8 +48,8 @@ eventcount *eventcount_create(char *name){
 
 	eventcount_init(ec_ptr, 0, name);
 
-	//put the new ctx in the global ctx list
-	desim_list_insert(eclist, 0, ec_ptr);
+	//for destroying the ec later
+	desim_list_insert(ecdestroylist, 0, ec_ptr);
 
 	return ec_ptr;
 }
@@ -137,7 +137,6 @@ void advance(eventcount *ec){
 
 void context_destroy(context *ctx_ptr){
 
-	printf("destroying %s\n", ctx_ptr->name);
 	free(ctx_ptr->name);
 	free(ctx_ptr->stack);
 	ctx_ptr->start = NULL;
@@ -150,7 +149,6 @@ void context_destroy(context *ctx_ptr){
 
 void eventcount_destroy(eventcount *ec_ptr){
 
-	printf("destroying ec %s\n", ec_ptr->name);
 	free(ec_ptr->name);
 	desim_list_clear(ec_ptr->ctxlist);
 	desim_list_free(ec_ptr->ctxlist);
@@ -309,9 +307,9 @@ void desim_end(void){
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
 
-	LIST_FOR_EACH(eclist, i, 0)
+	LIST_FOR_EACH(ecdestroylist, i, 0)
 	{
-		ec_ptr = desim_list_get(eclist, i);
+		ec_ptr = desim_list_get(ecdestroylist, i);
 
 		if(ec_ptr)
 			eventcount_destroy(ec_ptr);
@@ -331,8 +329,8 @@ void desim_end(void){
 	desim_list_clear(ctxlist);
 	desim_list_free(ctxlist);
 
-	desim_list_clear(eclist);
-	desim_list_free(eclist);
+	desim_list_clear(ecdestroylist);
+	desim_list_free(ecdestroylist);
 
 	return;
 }

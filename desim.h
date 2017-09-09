@@ -87,7 +87,7 @@ enum {false, true};
 /* Globals*/
 list *ctxdestroylist;
 list *ctxlist;
-list *eclist;
+list *ecdestroylist;
 
 eventcount *etime;
 context *current_context;
