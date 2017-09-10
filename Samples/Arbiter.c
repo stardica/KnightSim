@@ -81,12 +81,6 @@ int main(void){
 	return 1;
 }
 
-
-	/*printf("\t await ec_p_%d cycle %llu\n", (int)my_pid, CYCLE);
-		await(&ec_p[my_pid], j);
-		j++;
-		printf("producer_%d:\n", (int)my_pid);*/
-
 void producer(void){
 
 	count i = 0;
@@ -106,6 +100,7 @@ void producer(void){
 		else
 		{
 			/**********do work here***********/
+			printf("producer_%d:\n", (int)my_pid);
 
 			/*set busy (normally this would be based on the state of some
 			simulated structure like an input queue*/
@@ -117,8 +112,10 @@ void producer(void){
 
 			P_PAUSE(1);
 
+			printf("producer_%d:\n", (int)my_pid);
+
 			//await work
-			printf("\t await ec_a cycle %llu\n", CYCLE);
+			printf("\t await ec_p cycle %llu\n", CYCLE);
 			await(ec_p, j);
 
 			//inc loop
@@ -142,27 +139,20 @@ void arbiter(void){
 		printf("\t await ec_a cycle %llu\n", CYCLE);
 		await(ec_a, i);
 		i++;
-		printf("arbiter:\n\t advanced and doing work cycle %llu\n", CYCLE);
 
-
+		//work in the sub clock domain
 		AWAIT_P_PHI1;
 
-		fatal("on the half cycle %llu\n", CYCLE);
+		printf("arbiter:\n\t advanced and doing work cycle %llu\n", CYCLE);
 
 		AWAIT_P_PHI0;
+		printf("arbiter:\n");
 
-		fatal("done\n");
-
-		/**********do work here***********/
-
-		//charge latency
-		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
-		pause(LATENCY);
-		printf("\t resuming from latency cycle %llu\n", CYCLE);
+		producer_ready[0] = 0;
 
 		/*advance producer ctx*/
-		printf("\t advancing ec_p cycle %llu\n", CYCLE);
-		advance(ec_p);
+		printf("\t advancing ec_c cycle %llu\n", CYCLE);
+		advance(ec_c);
 	}
 
 	fatal("arbiter should never exit cycle %llu\n", CYCLE);
@@ -180,7 +170,6 @@ void consumer(void){
 		//await work
 		printf("\t await ec_c cycle %llu\n", CYCLE);
 		await(ec_c, i);
-
 		i++;
 		printf("consumer:\n\t advanced and doing work cycle %llu\n", CYCLE);
 
@@ -189,6 +178,8 @@ void consumer(void){
 		//charge latency
 		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
 		pause(LATENCY);
+
+		printf("consumer:\n");
 		printf("\t resuming from latency cycle %llu\n", CYCLE);
 
 		/*advance producer ctx*/
