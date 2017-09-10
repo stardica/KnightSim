@@ -120,7 +120,10 @@ void advance(eventcount *ec){
 		context_ptr = desim_list_get(ec->ctxlist, i);
 		if(context_ptr && (context_ptr->count <= ec->count))
 		{
-			assert(context_ptr->count == ec->count);
+
+			printf("context_ptr->count %llu ec->count %llu name %s", context_ptr->count, ec->count, ec->name);
+			fflush(stdout);
+			assert(context_ptr->count <= ec->count);
 			context_ptr->count = etime->count;
 			context_ptr = desim_list_dequeue(ec->ctxlist);
 			desim_list_enqueue(ctxlist, context_ptr);

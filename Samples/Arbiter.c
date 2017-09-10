@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define LOOP 3
 #define LATENCY 4
@@ -36,7 +37,7 @@ int main(void){
 
 	//this creates an event couint for producer a and b
 	ec_p = (void *) calloc(2, sizeof(eventcount));
-	for(i = 0; i < 1; i++)
+	for(i = 0; i < 2; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "ec_p_%d", i);
@@ -55,7 +56,7 @@ int main(void){
 
 	//create the user defined contexts
 	//l1 i caches
-	for(i = 0; i < 1; i++)
+	for(i = 0; i < 2; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "producer_%d", i);
@@ -132,6 +133,8 @@ void arbiter(void){
 
 	count i = 1;
 
+	int input = 0;
+
 	printf("arbiter:\n\t init\n");
 	while(1)
 	{
@@ -145,10 +148,17 @@ void arbiter(void){
 
 		printf("arbiter:\n\t advanced and doing work cycle %llu\n", CYCLE);
 
+		assert(producer_ready[1] == 1 || producer_ready[0] == 1);
+
+		if(producer_ready[1] == 1)
+			input = 1;
+		else if (producer_ready[0] == 1)
+			input = 0;
+
 		AWAIT_P_PHI0;
 		printf("arbiter:\n");
 
-		producer_ready[0] = 0;
+		producer_ready[input] = 0;
 
 		/*advance producer ctx*/
 		printf("\t advancing ec_c cycle %llu\n", CYCLE);
