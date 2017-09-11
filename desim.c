@@ -101,15 +101,6 @@ void advance(eventcount *ec){
 
 	/*check ec's ctx list*/
 	context *context_ptr = NULL;
-	//context_ptr = desim_list_get(ec->ctxlist, 0);
-
-	/*check if there are any ctxs awaiting this ec's advance*/
-	//if((context_ptr == NULL) || (context_ptr->count > ec->count))
-	//{
-		/*no ctx waiting on this event count or
-		the currently awaiting ctx is older*/
-	//	return;
-//	}
 
 	/*if here, there is a ctx(s) waiting on this ec AND
 	 * its ready to run ready to run
@@ -118,9 +109,10 @@ void advance(eventcount *ec){
 	LIST_FOR_EACH(ec->ctxlist, i, 0)
 	{
 		context_ptr = desim_list_get(ec->ctxlist, i);
+
+
 		if(context_ptr && (context_ptr->count <= ec->count))
 		{
-
 			//printf("context_ptr->count %llu ec->count %llu name %s", context_ptr->count, ec->count, ec->name);
 			//fflush(stdout);
 			assert(context_ptr->count == ec->count);
@@ -130,6 +122,9 @@ void advance(eventcount *ec){
 		}
 		else
 		{
+			//no context or context is not ready to run
+			if(context_ptr)
+				assert(context_ptr->count > ec->count);
 			break;
 		}
 	}
