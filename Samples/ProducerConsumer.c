@@ -53,7 +53,7 @@ int main(void){
 void producer(void){
 
 	count i = 0;
-	count j = 0;
+	count j = 1;
 
 	printf("producer:\n\t init\n");
 	while(i < LOOP)
