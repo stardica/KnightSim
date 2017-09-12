@@ -23,7 +23,7 @@ typedef int __jmp_buf[6];
 
 typedef __jmp_buf jmp_buf;
 
-/*our assembly fucntions (.s) files these store
+/*our assembly fucntion (.s) files these store
 and load CPU register values. For DESim
 the stack pointer and instruction pointer are
 all we really care about.*/
