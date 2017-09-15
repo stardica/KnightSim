@@ -14,7 +14,7 @@
 #define AWAIT_SUB_CLOCK_1 if (!(etime->count & 0x1)) pause(1)
 
 //which input has priority
-#define AORB 0
+#define AORB 1
 
 eventcount *ec_prod_a;
 eventcount *ec_prod_b;
@@ -107,7 +107,7 @@ void producer_a(void){
 
 	pause(LATENCY);
 
-	printf("consumer:\n");
+	printf("producer_a:\n");
 	printf("\t resuming from latency cycle %llu\n", CYCLE);
 
 	printf("\t pausing cycle %llu\n", CYCLE);
@@ -138,7 +138,7 @@ void producer_b(void){
 
 	pause(LATENCY);
 
-	printf("consumer:\n");
+	printf("producer_b:\n");
 	printf("\t resuming from latency cycle %llu\n", CYCLE);
 
 	printf("\t pausing cycle %llu\n", CYCLE);
@@ -166,7 +166,7 @@ void arbiter(void){
 		if(consumer_busy)
 		{
 			//if the consumer is busy wait.
-			printf("arbiter:\n\t Waiting\n");
+			printf("arbiter:\n\t Waiting cycle %llu\n", CYCLE);
 			pause(1);
 		}
 		else

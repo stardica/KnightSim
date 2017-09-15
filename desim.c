@@ -11,13 +11,14 @@ list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
 list *ecdestroylist = NULL;
 
-context *curctx = NULL;
+context *last_context = NULL;
+context *current_context = NULL;
 context *ctxhint = NULL;
 eventcount *etime = NULL;
 
 long long ecid = 0;
 
-context *current_context = NULL;
+
 context *terminated_context = NULL;
 
 
@@ -106,12 +107,12 @@ void advance(eventcount *ec){
 	 * its ready to run ready to run
 	 * find the end of the ec's task list
 	 * and set all ctx time to current time (etime.cout)*/
-	LIST_FOR_EACH(ec->ctxlist, i, 0)
+	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
 	{
 		context_ptr = desim_list_get(ec->ctxlist, i);
 
 
-		if(context_ptr && (context_ptr->count <= ec->count))
+		if(context_ptr && (context_ptr->count == ec->count))
 		{
 			//printf("context_ptr->count %llu ec->count %llu name %s", context_ptr->count, ec->count, ec->name);
 			//fflush(stdout);
@@ -167,17 +168,17 @@ void pause(count value){
 context *context_select(void){
 
 	/*get next ctx to run*/
-	curctx = desim_list_get(ctxlist, 0);
+	current_context = desim_list_get(ctxlist, 0);
 
-	if(!curctx)
+	if(!current_context)
 	{
 		/*if there isn't a ctx on the global context list
 		we are ready to advance in cycles, pull from etime*/
-		curctx = desim_list_dequeue(etime->ctxlist);
+		current_context = desim_list_dequeue(etime->ctxlist);
 
 		/*if there isn't a ctx in etime's ctx list the simulation is
 		deadlocked this is a user simulation implementation problem*/
-		if(!curctx)
+		if(!current_context)
 		{
 			/*todo*/
 			/*exit gracefully*/
@@ -185,54 +186,54 @@ context *context_select(void){
 					"There is a problem with the simulation implementation.\n");
 		}
 
-		assert(curctx);
+		assert(current_context);
 
 		/*put at head of ec's ctx list*/
-		desim_list_insert(ctxlist, 0, curctx);
+		desim_list_insert(ctxlist, 0, current_context);
 	}
 
 	//etime is now the current cycle count determined by the ctx's count
-  	etime->count = curctx->count;
+  	etime->count = current_context->count;
 
-  	return curctx;
+  	return current_context;
 }
 
-void await(eventcount *ec, count value){
+/*void await(eventcount *ec, count value){
 
-	/*todo*/
-	/*check for stack overflows*/
+	todo
+	check for stack overflows
 	assert(ec);
 
-	/*continue if the ctx's count is less
-	 * than or equal to the ec's count*/
+	continue if the ctx's count is less
+	 * than or equal to the ec's count
 	if (ec->count >= value)
 		return;
 
-	/*the current context must now wait on this ec to be incremented*/
+	the current context must now wait on this ec to be incremented
 
-	/*we are here because of an await
+	we are here because of an await
 	stop the currect context and drop it into
-	the ec that this context is awaiting*/
+	the ec that this context is awaiting
 
-	/*determine if the ec has another context
-	in its awaiting ctx list*/
+	determine if the ec has another context
+	in its awaiting ctx list
 	context *context_ptr = NULL;
 	context_ptr = desim_list_get(ec->ctxlist, 0);
 	int i = 0;
 
 	if((context_ptr == NULL) || (value < context_ptr->count))
 	{
-		/*the current ec has no ctx link to it
+		the current ec has no ctx link to it
 		or an awaiting ctx is older and can run
 		after the current ctx (i.e. doesn't matter
-		when they execute)*/
+		when they execute)
 		assert(curctx);
 
-		/*get the current ctx*/
+		get the current ctx
 		context_ptr = desim_list_dequeue(ctxlist);
 		assert(context_ptr == curctx);
 
-		/*put at head of ec's ctx list*/
+		put at head of ec's ctx list
 		desim_list_insert(ec->ctxlist, 0, curctx);
 
 	}
@@ -241,14 +242,14 @@ void await(eventcount *ec, count value){
 		//we should have a ctx and its value should be less than the current value
 		assert(context_ptr);
 
-		/*if here, there is one or more ctx with a lower or equal count to this one.
+		if here, there is one or more ctx with a lower or equal count to this one.
 		The list must be kept in count order, so go down the list until you find
-		a spot to insert this ctx. if the count is equal keep going too.*/
+		a spot to insert this ctx. if the count is equal keep going too.
 
-		/*we already know that the first element's count is lower
+		we already know that the first element's count is lower
 		so start with the next element and go down the list until you
-		find an element with a larger count*/
-		LIST_FOR_EACH(ec->ctxlist, i, 1)
+		find an element with a larger count
+		LIST_FOR_EACH_L(ec->ctxlist, i, 1)
 		{
  			context_ptr = desim_list_get(ec->ctxlist, i);
 			if(context_ptr && context_ptr->count > value)
@@ -271,10 +272,54 @@ void await(eventcount *ec, count value){
 		}
 	}
 
-	/*the curctx pointer still points to this ctx
+	the curctx pointer still points to this ctx
 	sets when this task should execute next (cycles).
-	this is in conjunction with the ec it is waiting on.*/
+	this is in conjunction with the ec it is waiting on.
 	curctx->count = value;
+
+	context_switch(context_select());
+
+	return;
+}*/
+
+void await(eventcount *ec, count value){
+
+	/*todo
+	check for stack overflows*/
+	assert(ec);
+
+	/*continue if the ctx's count is less
+	 * than or equal to the ec's count*/
+	if (ec->count >= value)
+		return;
+
+	/*the current context must now wait on this ec to be incremented*/
+
+	/*we are here because of an await
+	stop the currect context and drop it into
+	the ec that this context is awaiting
+
+	determine if the ec has another context
+	in its awaiting ctx list*/
+	context *context_ptr = NULL;
+	int i = 0;
+
+	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
+	{
+		context_ptr = desim_list_get(ec->ctxlist, i);
+		if(!context_ptr || (context_ptr && value < context_ptr->count))
+		{
+			/*we are at the head or tail of the list
+			insert ctx at this position*/
+			context_ptr = desim_list_dequeue(ctxlist);
+
+			//set the curctx's value
+			context_ptr->count = value;
+			desim_list_insert(ec->ctxlist, i, context_ptr);
+			break;
+		}
+
+	}
 
 	context_switch(context_select());
 
@@ -305,7 +350,7 @@ void desim_end(void){
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
 
-	LIST_FOR_EACH(ecdestroylist, i, 0)
+	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
 		ec_ptr = desim_list_get(ecdestroylist, i);
 
@@ -313,7 +358,7 @@ void desim_end(void){
 			eventcount_destroy(ec_ptr);
 	}
 
-	LIST_FOR_EACH(ctxdestroylist, i, 0)
+	LIST_FOR_EACH_L(ctxdestroylist, i, 0)
 	{
 		ctx_ptr = desim_list_get(ctxdestroylist, i);
 
@@ -359,9 +404,9 @@ void context_stub(void){
 void context_switch (context *ctx_ptr)
 {
 
-	if (!current_context || !setjmp32_2(current_context->buf))
+	if (!last_context || !setjmp32_2(last_context->buf))
 	{
-	  current_context = ctx_ptr;
+	  last_context = ctx_ptr;
 	  longjmp32_2(ctx_ptr->buf, 1);
 	}
 
@@ -390,14 +435,14 @@ int context_simulate(void){
 void context_switch (context *ctx_ptr){
 
 	//setjmp returns 1 if jumping to this position via longjmp
-	if (!current_context || !setjmp64_2(current_context->buf))
+	if (!last_context || !setjmp64_2(last_context->buf))
 	{
 		/*ok, this is deep wizardry....
 		note that the jump is to the next context and the
 		setjmp is for the current context*/
 
-		current_context = ctx_ptr;
-		longjmp64_2(ctx_ptr->buf, 7);
+		last_context = ctx_ptr;
+		longjmp64_2(ctx_ptr->buf, 1);
 	}
 
 	return;

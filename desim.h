@@ -124,8 +124,11 @@ void desim_end(void);
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
-#define LIST_FOR_EACH(list_ptr, iter, iter_start_value) \
+#define LIST_FOR_EACH_L(list_ptr, iter, iter_start_value) \
 	for ((iter) = iter_start_value; (iter) < desim_list_count((list_ptr)); (iter)++)
+
+#define LIST_FOR_EACH_LG(list_ptr, iter, iter_start_value) \
+	for ((iter) = iter_start_value; (iter) <= desim_list_count((list_ptr)); (iter)++)
 
 #define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
 
