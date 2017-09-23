@@ -133,6 +133,29 @@ void advance(eventcount *ec){
 	return;
 }
 
+void context_terminate(void){
+
+	/*we are deliberately allowing a context to terminate it self
+	destroy the context and switch to the next context*/
+
+	context *ctx_ptr = NULL;
+
+	/*remove from global ctx and destroy lists*/
+	ctx_ptr = desim_list_dequeue(ctxlist);
+	ctx_ptr = desim_list_remove(ctxdestroylist, ctx_ptr);
+	assert(last_context == ctx_ptr);
+
+	context_destroy(ctx_ptr);
+
+	/*Its ok to leave the eventcount,
+	 * it will be destroyed on exit*/
+
+	/*switch to next context simulation should continue*/
+	context_switch(context_select());
+
+	return;
+}
+
 
 void context_destroy(context *ctx_ptr){
 
@@ -180,13 +203,10 @@ context *context_select(void){
 		deadlocked this is a user simulation implementation problem*/
 		if(!current_context)
 		{
-			/*todo*/
-			/*exit gracefully*/
-			fatal("DESim: deadlock detected ... all contexts are in an await state.\n"
+			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
 					"There is a problem with the simulation implementation.\n");
+			context_end();
 		}
-
-		assert(current_context);
 
 		/*put at head of ec's ctx list*/
 		desim_list_insert(ctxlist, 0, current_context);
@@ -198,89 +218,7 @@ context *context_select(void){
   	return current_context;
 }
 
-/*void await(eventcount *ec, count value){
 
-	todo
-	check for stack overflows
-	assert(ec);
-
-	continue if the ctx's count is less
-	 * than or equal to the ec's count
-	if (ec->count >= value)
-		return;
-
-	the current context must now wait on this ec to be incremented
-
-	we are here because of an await
-	stop the currect context and drop it into
-	the ec that this context is awaiting
-
-	determine if the ec has another context
-	in its awaiting ctx list
-	context *context_ptr = NULL;
-	context_ptr = desim_list_get(ec->ctxlist, 0);
-	int i = 0;
-
-	if((context_ptr == NULL) || (value < context_ptr->count))
-	{
-		the current ec has no ctx link to it
-		or an awaiting ctx is older and can run
-		after the current ctx (i.e. doesn't matter
-		when they execute)
-		assert(curctx);
-
-		get the current ctx
-		context_ptr = desim_list_dequeue(ctxlist);
-		assert(context_ptr == curctx);
-
-		put at head of ec's ctx list
-		desim_list_insert(ec->ctxlist, 0, curctx);
-
-	}
-	else
-	{
-		//we should have a ctx and its value should be less than the current value
-		assert(context_ptr);
-
-		if here, there is one or more ctx with a lower or equal count to this one.
-		The list must be kept in count order, so go down the list until you find
-		a spot to insert this ctx. if the count is equal keep going too.
-
-		we already know that the first element's count is lower
-		so start with the next element and go down the list until you
-		find an element with a larger count
-		LIST_FOR_EACH_L(ec->ctxlist, i, 1)
-		{
- 			context_ptr = desim_list_get(ec->ctxlist, i);
-			if(context_ptr && context_ptr->count > value)
-			{
-				break;
-			}
-		}
-
-		if(context_ptr)
-		{
-			//the next ctx's count is larger insert before before
-			context_ptr = desim_list_dequeue(ctxlist);
-			desim_list_insert(ec->ctxlist, i, context_ptr);
-		}
-		else
-		{
-			//never found any ctx with a larger count so insert at end
-			context_ptr = desim_list_dequeue(ctxlist);
-			desim_list_enqueue(ec->ctxlist, context_ptr);
-		}
-	}
-
-	the curctx pointer still points to this ctx
-	sets when this task should execute next (cycles).
-	this is in conjunction with the ec it is waiting on.
-	curctx->count = value;
-
-	context_switch(context_select());
-
-	return;
-}*/
 
 void await(eventcount *ec, count value){
 
@@ -343,7 +281,6 @@ void simulate(void){
 	return;
 }
 
-
 void desim_end(void){
 
 	int i = 0;
@@ -357,6 +294,9 @@ void desim_end(void){
 		if(ec_ptr)
 			eventcount_destroy(ec_ptr);
 	}
+
+
+
 
 	LIST_FOR_EACH_L(ctxdestroylist, i, 0)
 	{
@@ -379,7 +319,7 @@ void desim_end(void){
 }
 
 
-void context_stub(void){
+void context_start(void){
 
   if(terminated_context)
   {
@@ -398,81 +338,77 @@ void context_stub(void){
 }
 
 
-
-#if defined(__linux__) && defined(__i386__)
-
 void context_switch (context *ctx_ptr)
 {
+	//setjmp returns 1 if jumping to this position via longjmp
 
+	/*ok, this is deep wizardry....
+	note that the jump is to the next context and the
+	setjmp is for the current context*/
+
+#if defined(__linux__) && defined(__i386__)
 	if (!last_context || !setjmp32_2(last_context->buf))
 	{
 	  last_context = ctx_ptr;
 	  longjmp32_2(ctx_ptr->buf, 1);
 	}
+#elif defined(__linux__) && defined(__x86_64)
+	if (!last_context || !setjmp64_2(last_context->buf))
+	{
+		last_context = ctx_ptr;
+		longjmp64_2(ctx_ptr->buf, 1);
+	}
+#else
+#error Unsupported machine/OS combination
+#endif
 
-	return;
-}
-
-void context_init (context *new_context){
-
-	new_context->buf[5] = ((int)context_stub);
-	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
-}
-
-void context_end(void){
-
-	longjmp32_2(main_context, 1);
 	return;
 }
 
 int context_simulate(void){
 
+#if defined(__linux__) && defined(__i386__)
 	return setjmp32_2(main_context);
+#elif defined(__linux__) && defined(__x86_64)
+	return setjmp64_2(main_context);
+#else
+#error Unsupported machine/OS combination
+#endif
 }
 
+
+void context_end(void){
+
+#if defined(__linux__) && defined(__i386__)
+	longjmp32_2(main_context, 1);
 #elif defined(__linux__) && defined(__x86_64)
-
-void context_switch (context *ctx_ptr){
-
-	//setjmp returns 1 if jumping to this position via longjmp
-	if (!last_context || !setjmp64_2(last_context->buf))
-	{
-		/*ok, this is deep wizardry....
-		note that the jump is to the next context and the
-		setjmp is for the current context*/
-
-		last_context = ctx_ptr;
-		longjmp64_2(ctx_ptr->buf, 1);
-	}
+	longjmp64_2(main_context, 1);
+#else
+#error Unsupported machine/OS combination
+#endif
 
 	return;
 }
-
 
 void context_init(context *new_context){
 
 	/*these are in this function because they are architecture dependent.
 	don't move these out of this function!!!!*/
-	new_context->buf[7] = (long long)context_stub; /*where the initial jump will go to*/
-	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4); /*points to top of the virtual stack*/
-	return;
-}
 
-void context_end(void){
+	/*instruction pointer and then pointer to top of stack*/
 
-	longjmp64_2(main_context, 1);
-	return;
-}
-
-
-int context_simulate(void){
-
-	return setjmp64_2(main_context);
-}
-
+#if defined(__linux__) && defined(__i386__)
+	new_context->buf[5] = ((int)context_start);
+	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
+#elif defined(__linux__) && defined(__x86_64)
+	new_context->buf[7] = (long long)context_start;
+	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4);
 #else
 #error Unsupported machine/OS combination
 #endif
+
+	return;
+}
 
 
 //DESim Util Stuff

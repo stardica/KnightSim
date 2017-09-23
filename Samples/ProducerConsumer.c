@@ -29,9 +29,6 @@ int main(void){
 	ec_c = eventcount_create(strdup(buff));
 	printf("Event counts created\n");
 
-	printf("~~~~~~~size %lu\n", sizeof(int));
-
-
 	//create the user defined contexts
 	memset(buff,'\0' , 100);
 	snprintf(buff, 100, "producer");

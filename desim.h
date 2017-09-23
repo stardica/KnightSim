@@ -106,12 +106,12 @@ void await(eventcount *ec, count value);
 void advance(eventcount *ec);
 void pause(count value);
 
-
 //DESim private functions
 void eventcount_init(eventcount * ec, count count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
-void context_stub(void);
+void context_start(void);
+void context_terminate(void);
 int context_simulate(void);
 void context_end(void);
 context *context_select(void);
