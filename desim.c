@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/types.h>
 
 list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
@@ -54,6 +55,7 @@ void desim_init(void){
 
 	//create the thread pool
 #ifdef NUM_THREADS
+
 	desim_thread_pool_create();
 #endif
 
@@ -70,6 +72,10 @@ void desim_thread_pool_create(void){
 
 	threadlist = desim_list_create(NUM_THREADS);
 
+	/*initialize the thread hash table*/
+	for(i = 0; i < NUM_THREADS; i++)
+		thread_hash_table[i] = NULL;
+
 	for(i = 0; i < NUM_THREADS; i++)
 	{
 		//create threads here
@@ -77,7 +83,26 @@ void desim_thread_pool_create(void){
 		assert(new_thread);
 
 		desim_list_insert(threadlist, 0, new_thread);
+
+		 //long int temp1 = (int) new_thread->thread_handle;(long int)syscall(224)
+		//printf("The ID of this of this thread is: %ld\n", (long int)syscall(224));
+
+
+		//long long hash = (new_thread->thread_handle - NUM_THREADS) * (new_thread->thread_handle/NUM_THREADS);
+		//printf("hashed val %llu\n", hash);
+		//printf("thread id %llu\n", (long long)new_thread->thread_handle);
+		//long long hash = ((long long)new_thread->thread_handle) % ((long long)NUM_THREADS);
+		//printf("hash is %lu\n", new_thread->thread_handle % (unsigned long int)NUM_THREADS);
+
+		//printf("thread id %d temp %d\n", 282978048 % NUM_THREADS, (int) new_thread->thread_handle);//, new_thread->id % NUM_THREADS);
+
+		//printf("thread id %d hash %d\n", new_thread->id, new_thread->id % NUM_THREADS);
+
+		assert(thread_hash_table[new_thread->thread_handle % HASHSIZE] == NULL);
+		thread_hash_table[new_thread->thread_handle % HASHSIZE] = new_thread;
 	}
+
+	//fatal("here\n");
 
 	/*we must wait until all threads are created and awaiting work
 	 * when the last thread is created main will be signaled*/
@@ -302,7 +327,7 @@ void eventcount_destroy(eventcount *ec_ptr){
 }
 
 
-void pause(count value){
+void p_pause(count value){
 
 #ifdef NUM_THREADS
 	thread_pause(value);
@@ -562,12 +587,48 @@ void desim_end(void){
 	return;
 }
 
+thread *get_thread(pthread_t val){
+
+	thread *thread_ptr = NULL;
+
+	thread_ptr = thread_hash_table[val % HASHSIZE];
+	assert(thread_ptr);
+	assert(thread_ptr->thread_handle == val);
+
+	warning("pulled %d from hash table\n", thread_ptr->id);
+
+		/*int i = 0;
+	//unsigned long long mask = 0xFFFFFFFFFFFFFFFF;
+
+	unsigned long long temp1 = val;
+
+	//printf("val 0x%08llx size of type %d\n", (unsigned long long)val, (int) sizeof(unsigned long long));
+
+	unsigned long long temp2 = temp1 % 5;
+
+	printf("val %llu temp1 %llu hash %llu\n", (unsigned long long)val, temp1, temp2);
+
+	for(i=0;i<NUM_THREADS;i++)
+	{
+		printf("iteration %d\n",i);
+		if(thread_hash_table[i]->thread_handle == val)
+		{
+			thread_ptr = thread_hash_table[i];
+			break;
+		}
+	}
+*/
+	return thread_ptr;
+}
 
 void context_start(void){
 
-	pthread_t my_pid = pthread_self();
+	//OMG figure out who we are!!!
+	thread *thread_ptr = get_thread(pthread_self());
 
-	printf("context_start(): i am %llu \n", (long long) my_pid);
+
+	fatal("context_start(): i am long id %lu id %d\n", thread_ptr->thread_handle, thread_ptr->id);
+
 
 	if(terminated_context)
 	{

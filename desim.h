@@ -106,6 +106,14 @@ struct thread_t{
 	//jmp_buf sim_end; /*for returning to myself*/
 };
 
+#define HASHSIZE (NUM_THREADS + 23)
+
+//for quick look up
+#ifdef NUM_THREADS
+	thread *thread_hash_table[HASHSIZE];
+#endif
+
+
 /* Globals*/
 list *ctxdestroylist;
 list *ctxlist;
