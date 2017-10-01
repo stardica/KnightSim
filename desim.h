@@ -76,6 +76,7 @@ struct eventcount_t{
 	long long id;
 	list *ctxlist;
 	count count;		/* current value of event */
+	pthread_mutex_t count_mutex;
 };
 
 //Context objects
@@ -98,21 +99,20 @@ struct thread_t{
 	int return_val;
 	pthread_t thread_handle; /*my thread handle*/
 	context *context; /*The context I am to run*/
-	pthread_mutex_t state_mutex;
-	pthread_cond_t state;
-	pthread_mutex_t temp_mutex;
-	pthread_cond_t temp;
+	pthread_mutex_t run_mutex;
+	pthread_cond_t run;
+	pthread_mutex_t pause_mutex;
+	pthread_cond_t pause;
 	jmp_buf home; /*for returning to myself*/
-	//jmp_buf sim_end; /*for returning to myself*/
+	context *last_context;
 };
 
-#define HASHSIZE (NUM_THREADS + 23)
 
 //for quick look up
 #ifdef NUM_THREADS
+	#define HASHSIZE (NUM_THREADS + 23)
 	thread *thread_hash_table[HASHSIZE];
 #endif
-
 
 /* Globals*/
 list *ctxdestroylist;
@@ -126,21 +126,6 @@ context *terminated_context;
 context *curctx;
 
 jmp_buf main_context;
-long long ecid; //id for each event count
-
-//PDESim
-void desim_thread_pool_create(void);
-thread *desim_thread_create(void);
-void desim_thread_init(thread *new_thread);
-void desim_thread_task(thread *self);
-void thread_launch(void);
-void thread_context_switch(void);
-void thread_context_select(void);
-
-void thread_await(eventcount *ec, count value);
-void thread_advance(eventcount *ec);
-void thread_pause(count value);
-
 
 //DESim user level functions
 void desim_init(void);
@@ -164,8 +149,30 @@ void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
 void desim_end(void);
 
+//PDESim private functions
+void thread_pool_create(void);
+thread *thread_create(void);
+void thread_init(thread *new_thread);
+void thread_control(thread *self);
+thread *thread_get_ptr(pthread_t thread_handle);
+void thread_launch(void);
+void thread_etime_launch(void);
+void thread_context_init(context *new_context);
+void thread_context_start(void);
+void thread_context_switch(jmp_buf buf);
+void thread_context_select(void);
+void thread_sync(thread *thread_ptr);
+void thread_hault(jmp_buf buf);
+void thread_await(eventcount *ec, count value);
+void thread_advance(eventcount *ec);
+void thread_pause(count value);
+void thread_sleep(thread *thread_ptr);
 
-//DESim util stuff
+//DESim/PDESim util stuff
+#define FFLUSH fflush(stderr); fflush(stdout);
+
+void desim_pause(void);
+
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 

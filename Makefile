@@ -1,10 +1,11 @@
 #nuber of threads
 NUM_THREADS = 32
+#
 
 #compiler and linker
 CC_FLAGS_64 = -g3 -O3 -Wall -Werror
 CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32
-CC = gcc -DNUM_THREADS=$(NUM_THREADS) 
+CC = gcc -DNUM_THREADS=$(NUM_THREADS)
 LINKER_FLAGS_64 = -static -lDESim64 -lpthread
 LINKER_FLAGS_32 = -static -lDESim32 -lpthread
 

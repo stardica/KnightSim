@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <pthread.h>
-#include <sys/types.h>
+
 
 list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
@@ -19,6 +19,7 @@ context *ctxhint = NULL;
 eventcount *etime = NULL;
 
 long long ecid = 0;
+long long ctxid = 0;
 long long threadid = 0;
 
 
@@ -30,15 +31,17 @@ pthread_cond_t thread_created;
 pthread_mutex_t sim_end_mutex;
 pthread_cond_t sim_end;
 
+pthread_mutex_t thread_launch_mutex;
+
 count thread_count = 0;
+
 
 
 void desim_init(void){
 
 #ifdef NUM_THREADS
 	warning("desim_init(): DESim is running in parallel mode.\n");
-	fflush(stderr);
-	fflush(stdout);
+	FFLUSH
 #endif
 
 	char buff[100];
@@ -55,14 +58,14 @@ void desim_init(void){
 
 	//create the thread pool
 #ifdef NUM_THREADS
-
-	desim_thread_pool_create();
+	thread_pool_create();
 #endif
 
 	return;
 }
 
-void desim_thread_pool_create(void){
+#ifdef NUM_THREADS
+void thread_pool_create(void){
 
 	int i = 0;
 	thread *new_thread = NULL;
@@ -70,81 +73,83 @@ void desim_thread_pool_create(void){
 	pthread_mutex_init(&threads_created_mutex, NULL);
 	pthread_cond_init (&thread_created, NULL);
 
+	pthread_mutex_init(&thread_launch_mutex, NULL);
+
 	threadlist = desim_list_create(NUM_THREADS);
 
 	/*initialize the thread hash table*/
-	for(i = 0; i < NUM_THREADS; i++)
+
+	/*we are hashing based on the address of each
+	pthread_t. The table size can not be a power
+	of two. Pthread_t addresses are aligned to 32bit and 64bit
+	addresses. We just and some slack and make the table size
+	and odd number*/
+	for(i = 0; i < HASHSIZE; i++)
 		thread_hash_table[i] = NULL;
 
 	for(i = 0; i < NUM_THREADS; i++)
 	{
 		//create threads here
-		new_thread = desim_thread_create();
+		new_thread = thread_create();
 		assert(new_thread);
 
 		desim_list_insert(threadlist, 0, new_thread);
 
-		 //long int temp1 = (int) new_thread->thread_handle;(long int)syscall(224)
-		//printf("The ID of this of this thread is: %ld\n", (long int)syscall(224));
-
-
-		//long long hash = (new_thread->thread_handle - NUM_THREADS) * (new_thread->thread_handle/NUM_THREADS);
-		//printf("hashed val %llu\n", hash);
-		//printf("thread id %llu\n", (long long)new_thread->thread_handle);
-		//long long hash = ((long long)new_thread->thread_handle) % ((long long)NUM_THREADS);
-		//printf("hash is %lu\n", new_thread->thread_handle % (unsigned long int)NUM_THREADS);
-
-		//printf("thread id %d temp %d\n", 282978048 % NUM_THREADS, (int) new_thread->thread_handle);//, new_thread->id % NUM_THREADS);
-
-		//printf("thread id %d hash %d\n", new_thread->id, new_thread->id % NUM_THREADS);
+		if(thread_hash_table[new_thread->thread_handle % HASHSIZE] != NULL)
+			fatal("thread_pool_create(): more than one thread hashed to the same index, fix me.\n");
 
 		assert(thread_hash_table[new_thread->thread_handle % HASHSIZE] == NULL);
 		thread_hash_table[new_thread->thread_handle % HASHSIZE] = new_thread;
 	}
 
-	//fatal("here\n");
-
 	/*we must wait until all threads are created and awaiting work
-	 * when the last thread is created main will be signaled*/
+	 * when the last thread is created main will be signaled (thread_created)*/
 	pthread_mutex_lock(&threads_created_mutex);
 	while(thread_count < NUM_THREADS)
 	{
 		pthread_cond_wait(&thread_created, &threads_created_mutex);
-		printf("waiting?\n");
 	}
 	pthread_mutex_unlock(&threads_created_mutex);
 
-	warning("thread_count %d num threads %d\n", (int) thread_count, desim_list_count(threadlist));
+	warning("thread_pool_create(): Num threads %d threadlist size %d\n", (int) thread_count, desim_list_count(threadlist));
+	FFLUSH
 
 	return;
 }
 
-void desim_thread_init(thread *new_thread){
-
-	new_thread->id = threadid++;
-	new_thread->self = new_thread;
-	pthread_mutex_init(&new_thread->state_mutex, NULL);
-	pthread_cond_init (&new_thread->state, NULL);
-	new_thread->return_val = pthread_create(&new_thread->thread_handle, NULL, (void *)desim_thread_task, (void *) new_thread);
-
-	return;
-}
-
-thread *desim_thread_create(void){
+thread *thread_create(void){
 
 	thread *new_thread = NULL;
 
 	new_thread = (thread *)malloc(sizeof(thread));
 	assert(new_thread);
 
-	desim_thread_init(new_thread);
+	thread_init(new_thread);
 
 	return new_thread;
 }
 
-void desim_thread_task(thread *self){
+void thread_init(thread *new_thread){
 
-	printf("Thread created id %d\n", self->id);
+	new_thread->id = threadid++;
+	new_thread->self = new_thread;
+	pthread_mutex_init(&new_thread->run_mutex, NULL);
+	pthread_cond_init (&new_thread->run, NULL);
+	pthread_mutex_init(&new_thread->pause_mutex, NULL);
+	pthread_cond_init (&new_thread->pause, NULL);
+	new_thread->return_val = pthread_create(&new_thread->thread_handle, NULL, (void *)thread_control, (void *) new_thread);
+
+	return;
+}
+
+void thread_sync(thread *thread_ptr){
+
+	pthread_cond_wait(&thread_ptr->run, &thread_ptr->run_mutex);
+
+	return;
+}
+
+void thread_control(thread *self){
 
 	//signal main if this is the last thread
 	pthread_mutex_lock(&threads_created_mutex);
@@ -155,30 +160,301 @@ void desim_thread_task(thread *self){
 
 	pthread_mutex_unlock(&threads_created_mutex);
 
+
 	while(1){
 
-		printf("Thread awaiting id %d\n", self->id);
-		pthread_cond_wait(&self->state, &self->state_mutex);
+		//printf("thread_control(): thread awaiting id %d\n", self->id);
+		assert(self->context == NULL);
+		thread_sync(self); //wait here until given work to do
 
-		warning("Thread processing id %d\n", self->id);
+		assert(self->context);
+		//warning("thread_control(): thread id %d processing context id %d\n", self->id, self->context->id);
 
 		if(!context_simulate(self->home))
-		{
-			assert(self->context);
-			context_switch(self->context);
-		}
+			thread_context_switch(self->context->buf);
 
-
-		printf("Thread has returned id %d\n", self->id);
-		fflush(stdout);
-
-		pthread_cond_wait(&self->temp, &self->temp_mutex);
-
-
+		//printf("thread_control(): thread has returned id %d\n", self->id);
+		//FFLUSH
 	}
 
 	return;
 }
+
+void thread_await(eventcount *ec, count value){
+
+	//OMG! figure out who we are!!!
+	thread *thread_ptr = thread_get_ptr(pthread_self());
+	context *context_ptr = NULL;
+	int i = 0;
+
+	/*the current context must now wait on this ec to be incremented*/
+
+	/*we are here because of an await
+	stop the current context and drop it into
+	the ec that this context is awaiting
+
+	determine if the ec has another context
+	in its awaiting ctx list*/
+
+	/*continue if the ctx's count is less
+	 * than or equal to the ec's count*/
+
+	pthread_mutex_lock(&ec->count_mutex); //lock this section
+	if (ec->count >= value){
+
+		//printf("thread_await(): continuing ec->count %d val %d id %d\n", (int) ec->count, (int) value, thread_ptr->id);
+		pthread_mutex_unlock(&ec->count_mutex);
+		return;
+	}
+
+	//printf("thread_await(): halting ec->count %d val %d id %d\n", (int) ec->count, (int) value, thread_ptr->id);
+	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
+	{
+		context_ptr = desim_list_get(ec->ctxlist, i);
+		if(!context_ptr || (context_ptr && value < context_ptr->count))
+		{
+			/*we are at the head or tail of the list
+			insert ctx at this position*/
+
+			//printf("thread_await(): context removed and added to ec id %d\n", thread_ptr->id);
+			//set the curctx's value
+			thread_ptr->context->count = value;
+			desim_list_insert(ec->ctxlist, i, thread_ptr->context);
+			break;
+		}
+	}
+
+	/*Halt this thread. Update the context's last position,
+	return the thread and context to their queues.*/
+	if(!context_simulate(thread_ptr->context->buf))
+	{
+		//clear context pointer
+		thread_ptr->context = NULL;
+
+		//deschedule thread
+		desim_list_enqueue(threadlist, thread_ptr);
+
+		//exit critical section
+		pthread_mutex_unlock(&ec->count_mutex);
+
+		/*check for cycle advance! If no contexts are avaiaable
+		and all threads are halted the simulation is ready
+		to advance in cycles pull all contexts that are ready
+		to run from etime's ctx list and launch threads*/
+
+		pthread_mutex_unlock(&thread_launch_mutex);
+		if(desim_list_count(ctxlist) == 0 && desim_list_count(threadlist) == 32)
+		{
+			thread_etime_launch();
+		}
+		pthread_mutex_lock(&thread_launch_mutex);
+
+		context_end(thread_ptr->home);
+	}
+
+
+	//if here resuming context from last position.
+	return;
+}
+
+void thread_advance(eventcount *ec){
+
+	int i = 0;
+
+	/*check ec's ctx list*/
+	context *context_ptr = NULL;
+
+	/* advance the ec's count */
+	pthread_mutex_lock(&ec->count_mutex); //lock this section
+	ec->count++;
+
+	/*if here, there is a ctx(s) waiting on this ec AND
+	 * its ready to run ready to run
+	 * find the end of the ec's task list
+	 * and set all ctx time to current time (etime.cout)*/
+	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
+	{
+		context_ptr = desim_list_get(ec->ctxlist, i);
+
+		if(context_ptr && (context_ptr->count == ec->count))
+		{
+			assert(context_ptr->count == ec->count);
+			context_ptr->count = etime->count;
+			context_ptr = desim_list_dequeue(ec->ctxlist);
+			desim_list_enqueue(ctxlist, context_ptr);
+		}
+		else
+		{
+			//no context or context is not ready to run
+			if(context_ptr)
+				assert(context_ptr->count > ec->count);
+			break;
+		}
+	}
+	pthread_mutex_unlock(&ec->count_mutex);
+
+	thread_launch();
+
+	return;
+}
+
+void thread_pause(count value){
+
+	return;
+}
+
+void thread_sleep(thread *thread_ptr){
+
+	pthread_cond_wait(&thread_ptr->pause, &thread_ptr->pause_mutex);
+	return;
+}
+
+
+
+void thread_etime_launch(void){
+
+	//no mutex needed, as all threads have stopped.
+	thread *thread_ptr = NULL;
+	context *context_ptr = NULL;
+	count next_ctx_count = 0;
+	int i = 0;
+
+	//remove the first context from the etime's ctxlist
+	context_ptr = desim_list_dequeue(etime->ctxlist);
+	next_ctx_count = context_ptr->count;
+	desim_list_enqueue(ctxlist, context_ptr);
+
+	//Pull any other contexts that have the same count as the first
+	LIST_FOR_EACH_L(etime->ctxlist, i, 0)
+	{
+		context_ptr = desim_list_get(etime->ctxlist, i);
+
+		if(context_ptr && (next_ctx_count == context_ptr->count))
+		{
+			context_ptr = desim_list_remove(etime->ctxlist, context_ptr);
+			desim_list_enqueue(ctxlist, context_ptr);
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	//we have loaded up the ctx list with contexts to run launch threads
+
+	/*pull a thread from the threads list assign it a context and
+	signal the thread to run the context*/
+	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
+	{
+		thread_ptr = desim_list_dequeue(threadlist);
+		context_ptr = desim_list_dequeue(ctxlist);
+		assert(thread_ptr && context_ptr);
+
+		//warning("thread_launch(): thread %d assigned ctx id %d\n", thread_ptr->id, context_ptr->id);
+
+		//etime is now the current cycle count determined by the ctx's count
+		etime->count = context_ptr->count;
+
+		thread_ptr->context = context_ptr;
+
+		pthread_cond_signal(&thread_ptr->run);
+	}
+
+	return;
+}
+
+void thread_launch(void){
+
+	thread *thread_ptr = NULL;
+	context *context_ptr = NULL;
+
+	/*pull a thread from the threads list assign it a context and
+	signal the thread to run the context*/
+	pthread_mutex_unlock(&thread_launch_mutex);
+	assert(desim_list_count(threadlist) != 0);
+	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
+	{
+		thread_ptr = desim_list_dequeue(threadlist);
+		context_ptr = desim_list_dequeue(ctxlist);
+		assert(thread_ptr && context_ptr);
+
+		//warning("thread_launch(): thread %d assigned ctx id %d\n", thread_ptr->id, context_ptr->id);
+
+		//etime is now the current cycle count determined by the ctx's count
+		etime->count = context_ptr->count;
+
+		thread_ptr->context = context_ptr;
+
+		pthread_cond_signal(&thread_ptr->run);
+	}
+	pthread_mutex_lock(&thread_launch_mutex);
+
+	return;
+
+}
+
+thread *thread_get_ptr(pthread_t thread_handle){
+
+	thread *thread_ptr = NULL;
+
+	thread_ptr = thread_hash_table[thread_handle % HASHSIZE];
+	assert(thread_ptr);
+	assert(thread_ptr->thread_handle == thread_handle);
+
+	return thread_ptr;
+}
+
+
+void thread_context_start(void){
+
+	//OMG figure out who we are!!!
+	thread *thread_ptr = thread_get_ptr(pthread_self());
+
+	(*thread_ptr->context->start)();
+
+	//fatal("context_start(): SIM ENDING\n");
+
+	/*if current current ctx returns i.e. hits the bottom of its function
+	it will return here. Then we need to terminate the simulation*/
+
+	context_end(main_context);
+
+	return;
+}
+
+void thread_context_switch(jmp_buf buf){
+
+#if defined(__linux__) && defined(__i386__)
+	longjmp32_2(buf, 1);
+#elif defined(__linux__) && defined(__x86_64)
+	longjmp64_2(buf, 1);
+#else
+#error Unsupported machine/OS combination
+#endif
+
+	return;
+}
+
+void thread_context_init(context *new_context){
+
+	/*these are in this function because they are architecture dependent.
+	don't move these out of this function!!!!*/
+
+	/*instruction pointer and then pointer to top of stack*/
+
+#if defined(__linux__) && defined(__i386__)
+	new_context->buf[5] = ((int)thread_context_start);
+	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
+#elif defined(__linux__) && defined(__x86_64)
+	new_context->buf[7] = (long long)thread_context_start;
+	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4);
+#else
+#error Unsupported machine/OS combination
+#endif
+
+	return;
+}
+#endif
 
 eventcount *eventcount_create(char *name){
 
@@ -209,13 +485,18 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	new_context_ptr->count = etime->count;
 	new_context_ptr->name = name;
+	new_context_ptr->id = ctxid++;
 	new_context_ptr->stack = (char *)malloc(stacksize);
 	assert(new_context_ptr->stack);
 	new_context_ptr->stacksize = stacksize;
 	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
 	new_context_ptr->start = func; /*assigns the head of a function*/
 
+#ifdef NUM_THREADS
+	thread_context_init(new_context_ptr);
+#else
 	context_init(new_context_ptr);
+#endif
 
 	//put the new ctx in the global ctx list
 	desim_list_insert(ctxlist, 0, new_context_ptr);
@@ -232,6 +513,7 @@ void eventcount_init(eventcount * ec, count count, char *ecname){
 	ec->id = ecid++;
 	ec->count = count;
 	ec->ctxlist = desim_list_create(4);
+	pthread_mutex_init(&ec->count_mutex, NULL); //only used for parallel implementations
     return;
 }
 
@@ -239,7 +521,7 @@ void advance(eventcount *ec){
 
 #ifdef NUM_THREADS
 	thread_advance(ec);
-#endif
+#else
 
 	int i = 0;
 
@@ -275,6 +557,8 @@ void advance(eventcount *ec){
 			break;
 		}
 	}
+
+#endif
 
 	return;
 }
@@ -327,13 +611,13 @@ void eventcount_destroy(eventcount *ec_ptr){
 }
 
 
-void p_pause(count value){
+void pause(count value){
 
 #ifdef NUM_THREADS
-	thread_pause(value);
-#endif
-
+	thread_await(etime, etime->count + value);
+#else
 	await(etime, etime->count + value);
+#endif
 
 	return;
 }
@@ -378,7 +662,7 @@ void await(eventcount *ec, count value){
 
 #ifdef NUM_THREADS
 	thread_await(ec, value);
-#endif
+#else
 
 	/*continue if the ctx's count is less
 	 * than or equal to the ec's count*/
@@ -414,6 +698,7 @@ void await(eventcount *ec, count value){
 	}
 
 	context_switch(context_select());
+#endif
 
 	return;
 }
@@ -426,11 +711,13 @@ void simulate(void){
 	{
 		/*This is the beginning of the simulation
 		 * get the first ctx and run it*/
-#ifdef NUM_THREADS
-	thread_launch();
-#else
-	context_switch(context_select());
-#endif
+		#ifdef NUM_THREADS
+			thread_launch();
+			/*pause until sim end*/
+			desim_pause();
+		#else
+			context_switch(context_select());
+		#endif
 	}
 
 	//clean up
@@ -440,114 +727,11 @@ void simulate(void){
 }
 
 
-void thread_await(eventcount *ec, count value){
 
 
-	printf("ctx thread %llu\n", (long long) current_context->thread->thread_handle);
+void desim_pause(void){
 
-#if defined(__linux__) && defined(__i386__)
-	longjmp32_2(current_context->thread->home, 1);
-#elif defined(__linux__) && defined(__x86_64)
-	longjmp64_2(current_context->thread->home, 1);
-#else
-#error Unsupported machine/OS combination
-#endif
-
-
-	return;
-}
-
-void thread_advance(eventcount *ec){
-
-
-	return;
-}
-
-void thread_pause(count value){
-
-
-	return;
-}
-
-void thread_launch(void){
-
-	thread *thread_ptr = NULL;
-	context *context_ptr = NULL;
-
-	printf("thread_launch(): threadlist size %d ctxlist size %d\n", desim_list_count(threadlist), desim_list_count(ctxlist));
-
-	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
-	{
-		thread_ptr = desim_list_dequeue(threadlist);
-		context_ptr = desim_list_dequeue(ctxlist);
-		assert(thread_ptr && context_ptr);
-
-		//etime is now the current cycle count determined by the ctx's count
-		etime->count = context_ptr->count;
-		assert(etime->count == 0); //sim start etime better be zero
-
-		warning("got thread %d long id %llu\n", thread_ptr->id, (long long) thread_ptr->thread_handle);
-
-		thread_ptr->context = context_ptr;
-		//current_context->thread = thread_ptr;
-		pthread_cond_signal(&thread_ptr->state);
-	}
-
-	/*temp pause for now*/
 	pthread_cond_wait(&sim_end, &sim_end_mutex);
-
-	fatal("this works\n");
-
-	return;
-
-}
-
-
-void thread_context_select(void){
-
-	thread *thread_ptr = NULL;
-
-	fatal("ctx select size %d size %d\n", desim_list_count(threadlist), desim_list_count(ctxlist));
-
-	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
-	{
-		thread_ptr = desim_list_dequeue(threadlist);
-
-		warning("got thread %llu\n", (long long) thread_ptr->thread_handle);
-	}
-
-	/*get a context to run*/
-	current_context = desim_list_get(ctxlist, 0);
-
-	if(!current_context)
-	{
-		/*if there isn't a ctx on the global context list
-		we are ready to advance in cycles, pull from etime*/
-		current_context = desim_list_dequeue(etime->ctxlist);
-
-		/*if there isn't a ctx in etime's ctx list the simulation is
-		deadlocked this is a user simulation implementation problem*/
-		if(!current_context)
-		{
-			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
-					"Simulation has either ended or there is a problem with the simulation implementation.\n");
-			context_end(main_context);
-		}
-
-		/*put at head of ec's ctx list*/
-		desim_list_insert(ctxlist, 0, current_context);
-	}
-
-	//etime is now the current cycle count determined by the ctx's count
-	etime->count = current_context->count;
-
-	thread_ptr->context = current_context;
-	current_context->thread = thread_ptr;
-	pthread_cond_signal(&thread_ptr->state);
-
-	pthread_cond_wait(&thread_created, &threads_created_mutex);
-
-	fatal("this works\n");
 
 	return;
 }
@@ -587,48 +771,8 @@ void desim_end(void){
 	return;
 }
 
-thread *get_thread(pthread_t val){
-
-	thread *thread_ptr = NULL;
-
-	thread_ptr = thread_hash_table[val % HASHSIZE];
-	assert(thread_ptr);
-	assert(thread_ptr->thread_handle == val);
-
-	warning("pulled %d from hash table\n", thread_ptr->id);
-
-		/*int i = 0;
-	//unsigned long long mask = 0xFFFFFFFFFFFFFFFF;
-
-	unsigned long long temp1 = val;
-
-	//printf("val 0x%08llx size of type %d\n", (unsigned long long)val, (int) sizeof(unsigned long long));
-
-	unsigned long long temp2 = temp1 % 5;
-
-	printf("val %llu temp1 %llu hash %llu\n", (unsigned long long)val, temp1, temp2);
-
-	for(i=0;i<NUM_THREADS;i++)
-	{
-		printf("iteration %d\n",i);
-		if(thread_hash_table[i]->thread_handle == val)
-		{
-			thread_ptr = thread_hash_table[i];
-			break;
-		}
-	}
-*/
-	return thread_ptr;
-}
 
 void context_start(void){
-
-	//OMG figure out who we are!!!
-	thread *thread_ptr = get_thread(pthread_self());
-
-
-	fatal("context_start(): i am long id %lu id %d\n", thread_ptr->thread_handle, thread_ptr->id);
-
 
 	if(terminated_context)
 	{
@@ -646,15 +790,7 @@ void context_start(void){
 	return;
 }
 
-void thread_context_switch(void){
-
-
-
-	return;
-}
-
-
-void context_switch (context *ctx_ptr)
+void context_switch(context *ctx_ptr)
 {
 	//setjmp returns 1 if jumping to this position via longjmp
 
@@ -662,7 +798,7 @@ void context_switch (context *ctx_ptr)
 	note that the jump is to the next context and the
 	setjmp is for the current context*/
 
-	printf("ctx switch():\n");
+	/*printf("ctx switch():\n");*/
 
 #if defined(__linux__) && defined(__i386__)
 	if (!last_context || !setjmp32_2(last_context->buf))
@@ -693,7 +829,6 @@ int context_simulate(jmp_buf buf){
 #error Unsupported machine/OS combination
 #endif
 }
-
 
 void context_end(jmp_buf buf){
 

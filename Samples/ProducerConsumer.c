@@ -28,6 +28,7 @@ int main(void){
 	snprintf(buff, 100, "ec_c");
 	ec_c = eventcount_create(strdup(buff));
 	printf("Event counts created\n");
+	FFLUSH
 
 	//create the user defined contexts
 	memset(buff,'\0' , 100);
@@ -38,7 +39,7 @@ int main(void){
 	snprintf(buff, 100, "consumer");
 	context_create(consumer, 32768, strdup(buff));
 	printf("Contexts created\n");
-
+	FFLUSH
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
@@ -53,6 +54,9 @@ void producer(void){
 
 	printf("producer:\n\t init\n");
 
+	//OMG figure out who we are!!!
+	//thread *thread_ptr = thread_get_ptr(pthread_self());
+
 	count i = 0;
 	count j = 1;
 
@@ -62,8 +66,13 @@ void producer(void){
 		printf("\t advancing ec_c cycle %llu\n", CYCLE);
 		advance(ec_c);
 
+		//fatal("producer after pause\n");
+
 		printf("\t await ec_p cycle %llu\n", CYCLE);
 		await(ec_p, j);
+
+		//thread_sleep(thread_ptr);
+
 		j++;
 		printf("producer:\n");
 		printf("\t advanced and doing work cycle %llu\n", CYCLE);
@@ -81,6 +90,9 @@ void consumer(void){
 
 	printf("consumer:\n\t init\n");
 
+	//OMG figure out who we are!!!
+	//thread *thread_ptr = thread_get_ptr(pthread_self());
+
 	count i = 1;
 
 	while(1)
@@ -90,6 +102,9 @@ void consumer(void){
 		await(ec_c, i);
 		i++;
 		printf("consumer:\n\t advanced and doing work cycle %llu\n", CYCLE);
+
+		//thread_sleep(thread_ptr);
+
 
 		/**********do work here***********/
 
