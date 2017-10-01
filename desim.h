@@ -1,6 +1,8 @@
 #ifndef __DESim_H__
 #define __DESim_H__
 
+#include <pthread.h>
+
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 32768
 #endif
@@ -45,10 +47,19 @@ int decode32(int val);
 #error Unsupported machine/OS combination
 #endif
 
+#define CYCLE etime->count
+
 typedef Time_t count;
 typedef struct context_t context;
 typedef struct eventcount_t eventcount;
 typedef struct list_t list;
+typedef struct thread_t thread;
+
+/*typedef int thread_state;
+enum {halted, running};*/
+
+typedef int bool;
+enum {false, true};
 
 struct list_t{
 	char *name;
@@ -77,17 +88,29 @@ struct context_t{
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
 	int stacksize;		/*stack size*/
+	thread *thread;  /*for parallel execution*/
 };
 
-typedef int bool;
-enum {false, true};
-
-#define CYCLE etime->count
+//threads
+struct thread_t{
+	int id;	/*thread id for debugging*/
+	thread * self; /*pointer to myself*/
+	int return_val;
+	pthread_t thread_handle; /*my thread handle*/
+	context *context; /*The context I am to run*/
+	pthread_mutex_t state_mutex;
+	pthread_cond_t state;
+	pthread_mutex_t temp_mutex;
+	pthread_cond_t temp;
+	jmp_buf home; /*for returning to myself*/
+	//jmp_buf sim_end; /*for returning to myself*/
+};
 
 /* Globals*/
 list *ctxdestroylist;
 list *ctxlist;
 list *ecdestroylist;
+list *threadlist;
 
 eventcount *etime;
 context *current_context;
@@ -96,6 +119,20 @@ context *curctx;
 
 jmp_buf main_context;
 long long ecid; //id for each event count
+
+//PDESim
+void desim_thread_pool_create(void);
+thread *desim_thread_create(void);
+void desim_thread_init(thread *new_thread);
+void desim_thread_task(thread *self);
+void thread_launch(void);
+void thread_context_switch(void);
+void thread_context_select(void);
+
+void thread_await(eventcount *ec, count value);
+void thread_advance(eventcount *ec);
+void thread_pause(count value);
+
 
 //DESim user level functions
 void desim_init(void);
@@ -112,8 +149,8 @@ void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
 void context_start(void);
 void context_terminate(void);
-int context_simulate(void);
-void context_end(void);
+int context_simulate(jmp_buf buf);
+void context_end(jmp_buf buf);
 context *context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);

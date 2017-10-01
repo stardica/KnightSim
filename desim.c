@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <pthread.h>
 
 list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
@@ -17,12 +18,27 @@ context *ctxhint = NULL;
 eventcount *etime = NULL;
 
 long long ecid = 0;
+long long threadid = 0;
 
 
 context *terminated_context = NULL;
 
+pthread_mutex_t threads_created_mutex;
+pthread_cond_t thread_created;
+
+pthread_mutex_t sim_end_mutex;
+pthread_cond_t sim_end;
+
+count thread_count = 0;
+
 
 void desim_init(void){
+
+#ifdef NUM_THREADS
+	warning("desim_init(): DESim is running in parallel mode.\n");
+	fflush(stderr);
+	fflush(stdout);
+#endif
 
 	char buff[100];
 
@@ -36,6 +52,105 @@ void desim_init(void){
 	snprintf(buff, 100, "etime");
 	etime = eventcount_create(strdup(buff));
 
+	//create the thread pool
+#ifdef NUM_THREADS
+	desim_thread_pool_create();
+#endif
+
+	return;
+}
+
+void desim_thread_pool_create(void){
+
+	int i = 0;
+	thread *new_thread = NULL;
+
+	pthread_mutex_init(&threads_created_mutex, NULL);
+	pthread_cond_init (&thread_created, NULL);
+
+	threadlist = desim_list_create(NUM_THREADS);
+
+	for(i = 0; i < NUM_THREADS; i++)
+	{
+		//create threads here
+		new_thread = desim_thread_create();
+		assert(new_thread);
+
+		desim_list_insert(threadlist, 0, new_thread);
+	}
+
+	/*we must wait until all threads are created and awaiting work
+	 * when the last thread is created main will be signaled*/
+	pthread_mutex_lock(&threads_created_mutex);
+	while(thread_count < NUM_THREADS)
+	{
+		pthread_cond_wait(&thread_created, &threads_created_mutex);
+		printf("waiting?\n");
+	}
+	pthread_mutex_unlock(&threads_created_mutex);
+
+	warning("thread_count %d num threads %d\n", (int) thread_count, desim_list_count(threadlist));
+
+	return;
+}
+
+void desim_thread_init(thread *new_thread){
+
+	new_thread->id = threadid++;
+	new_thread->self = new_thread;
+	pthread_mutex_init(&new_thread->state_mutex, NULL);
+	pthread_cond_init (&new_thread->state, NULL);
+	new_thread->return_val = pthread_create(&new_thread->thread_handle, NULL, (void *)desim_thread_task, (void *) new_thread);
+
+	return;
+}
+
+thread *desim_thread_create(void){
+
+	thread *new_thread = NULL;
+
+	new_thread = (thread *)malloc(sizeof(thread));
+	assert(new_thread);
+
+	desim_thread_init(new_thread);
+
+	return new_thread;
+}
+
+void desim_thread_task(thread *self){
+
+	printf("Thread created id %d\n", self->id);
+
+	//signal main if this is the last thread
+	pthread_mutex_lock(&threads_created_mutex);
+	thread_count++;
+
+	if(thread_count == NUM_THREADS)
+		pthread_cond_signal(&thread_created);
+
+	pthread_mutex_unlock(&threads_created_mutex);
+
+	while(1){
+
+		printf("Thread awaiting id %d\n", self->id);
+		pthread_cond_wait(&self->state, &self->state_mutex);
+
+		warning("Thread processing id %d\n", self->id);
+
+		if(!context_simulate(self->home))
+		{
+			assert(self->context);
+			context_switch(self->context);
+		}
+
+
+		printf("Thread has returned id %d\n", self->id);
+		fflush(stdout);
+
+		pthread_cond_wait(&self->temp, &self->temp_mutex);
+
+
+	}
 
 	return;
 }
@@ -54,6 +169,8 @@ eventcount *eventcount_create(char *name){
 
 	return ec_ptr;
 }
+
+
 
 void context_create(void (*func)(void), unsigned stacksize, char *name){
 
@@ -94,6 +211,10 @@ void eventcount_init(eventcount * ec, count count, char *ecname){
 }
 
 void advance(eventcount *ec){
+
+#ifdef NUM_THREADS
+	thread_advance(ec);
+#endif
 
 	int i = 0;
 
@@ -183,6 +304,10 @@ void eventcount_destroy(eventcount *ec_ptr){
 
 void pause(count value){
 
+#ifdef NUM_THREADS
+	thread_pause(value);
+#endif
+
 	await(etime, etime->count + value);
 
 	return;
@@ -204,8 +329,8 @@ context *context_select(void){
 		if(!current_context)
 		{
 			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
-					"There is a problem with the simulation implementation.\n");
-			context_end();
+					"Simulation has either ended or there is a problem with the simulation implementation.\n");
+			context_end(main_context);
 		}
 
 		/*put at head of ec's ctx list*/
@@ -225,6 +350,10 @@ void await(eventcount *ec, count value){
 	/*todo
 	check for stack overflows*/
 	assert(ec);
+
+#ifdef NUM_THREADS
+	thread_await(ec, value);
+#endif
 
 	/*continue if the ctx's count is less
 	 * than or equal to the ec's count*/
@@ -268,15 +397,132 @@ void await(eventcount *ec, count value){
 void simulate(void){
 
 	//simulate
-	if(!context_simulate())
+	if(!context_simulate(main_context))
 	{
 		/*This is the beginning of the simulation
 		 * get the first ctx and run it*/
-		context_switch(context_select());
+#ifdef NUM_THREADS
+	thread_launch();
+#else
+	context_switch(context_select());
+#endif
 	}
 
 	//clean up
 	desim_end();
+
+	return;
+}
+
+
+void thread_await(eventcount *ec, count value){
+
+
+	printf("ctx thread %llu\n", (long long) current_context->thread->thread_handle);
+
+#if defined(__linux__) && defined(__i386__)
+	longjmp32_2(current_context->thread->home, 1);
+#elif defined(__linux__) && defined(__x86_64)
+	longjmp64_2(current_context->thread->home, 1);
+#else
+#error Unsupported machine/OS combination
+#endif
+
+
+	return;
+}
+
+void thread_advance(eventcount *ec){
+
+
+	return;
+}
+
+void thread_pause(count value){
+
+
+	return;
+}
+
+void thread_launch(void){
+
+	thread *thread_ptr = NULL;
+	context *context_ptr = NULL;
+
+	printf("thread_launch(): threadlist size %d ctxlist size %d\n", desim_list_count(threadlist), desim_list_count(ctxlist));
+
+	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
+	{
+		thread_ptr = desim_list_dequeue(threadlist);
+		context_ptr = desim_list_dequeue(ctxlist);
+		assert(thread_ptr && context_ptr);
+
+		//etime is now the current cycle count determined by the ctx's count
+		etime->count = context_ptr->count;
+		assert(etime->count == 0); //sim start etime better be zero
+
+		warning("got thread %d long id %llu\n", thread_ptr->id, (long long) thread_ptr->thread_handle);
+
+		thread_ptr->context = context_ptr;
+		//current_context->thread = thread_ptr;
+		pthread_cond_signal(&thread_ptr->state);
+	}
+
+	/*temp pause for now*/
+	pthread_cond_wait(&sim_end, &sim_end_mutex);
+
+	fatal("this works\n");
+
+	return;
+
+}
+
+
+void thread_context_select(void){
+
+	thread *thread_ptr = NULL;
+
+	fatal("ctx select size %d size %d\n", desim_list_count(threadlist), desim_list_count(ctxlist));
+
+	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
+	{
+		thread_ptr = desim_list_dequeue(threadlist);
+
+		warning("got thread %llu\n", (long long) thread_ptr->thread_handle);
+	}
+
+	/*get a context to run*/
+	current_context = desim_list_get(ctxlist, 0);
+
+	if(!current_context)
+	{
+		/*if there isn't a ctx on the global context list
+		we are ready to advance in cycles, pull from etime*/
+		current_context = desim_list_dequeue(etime->ctxlist);
+
+		/*if there isn't a ctx in etime's ctx list the simulation is
+		deadlocked this is a user simulation implementation problem*/
+		if(!current_context)
+		{
+			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
+					"Simulation has either ended or there is a problem with the simulation implementation.\n");
+			context_end(main_context);
+		}
+
+		/*put at head of ec's ctx list*/
+		desim_list_insert(ctxlist, 0, current_context);
+	}
+
+	//etime is now the current cycle count determined by the ctx's count
+	etime->count = current_context->count;
+
+	thread_ptr->context = current_context;
+	current_context->thread = thread_ptr;
+	pthread_cond_signal(&thread_ptr->state);
+
+	pthread_cond_wait(&thread_created, &threads_created_mutex);
+
+	fatal("this works\n");
 
 	return;
 }
@@ -294,8 +540,6 @@ void desim_end(void){
 		if(ec_ptr)
 			eventcount_destroy(ec_ptr);
 	}
-
-
 
 
 	LIST_FOR_EACH_L(ctxdestroylist, i, 0)
@@ -321,20 +565,31 @@ void desim_end(void){
 
 void context_start(void){
 
-  if(terminated_context)
-  {
-    context_destroy (terminated_context);
-    terminated_context = NULL;
-  }
+	pthread_t my_pid = pthread_self();
 
-  (*current_context->start)();
+	printf("context_start(): i am %llu \n", (long long) my_pid);
 
-  /*if current current ctx returns i.e. hits the bottom of its function
-  it will return here. Then we need to terminate the simulation*/
+	if(terminated_context)
+	{
+	context_destroy (terminated_context);
+	terminated_context = NULL;
+	}
 
-  context_end();
+	(*current_context->start)();
 
-  return;
+	/*if current current ctx returns i.e. hits the bottom of its function
+	it will return here. Then we need to terminate the simulation*/
+
+	context_end(main_context);
+
+	return;
+}
+
+void thread_context_switch(void){
+
+
+
+	return;
 }
 
 
@@ -345,6 +600,8 @@ void context_switch (context *ctx_ptr)
 	/*ok, this is deep wizardry....
 	note that the jump is to the next context and the
 	setjmp is for the current context*/
+
+	printf("ctx switch():\n");
 
 #if defined(__linux__) && defined(__i386__)
 	if (!last_context || !setjmp32_2(last_context->buf))
@@ -365,24 +622,24 @@ void context_switch (context *ctx_ptr)
 	return;
 }
 
-int context_simulate(void){
+int context_simulate(jmp_buf buf){
 
 #if defined(__linux__) && defined(__i386__)
-	return setjmp32_2(main_context);
+	return setjmp32_2(buf);
 #elif defined(__linux__) && defined(__x86_64)
-	return setjmp64_2(main_context);
+	return setjmp64_2(buf);
 #else
 #error Unsupported machine/OS combination
 #endif
 }
 
 
-void context_end(void){
+void context_end(jmp_buf buf){
 
 #if defined(__linux__) && defined(__i386__)
-	longjmp32_2(main_context, 1);
+	longjmp32_2(buf, 1);
 #elif defined(__linux__) && defined(__x86_64)
-	longjmp64_2(main_context, 1);
+	longjmp64_2(buf, 1);
 #else
 #error Unsupported machine/OS combination
 #endif

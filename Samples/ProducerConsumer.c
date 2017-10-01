@@ -51,13 +51,13 @@ int main(void){
 
 void producer(void){
 
+	printf("producer:\n\t init\n");
+
 	count i = 0;
 	count j = 1;
 
-	printf("producer:\n\t init\n");
 	while(i < LOOP)
 	{
-
 		/**********do work here***********/
 		printf("\t advancing ec_c cycle %llu\n", CYCLE);
 		advance(ec_c);
@@ -79,9 +79,10 @@ void producer(void){
 
 void consumer(void){
 
+	printf("consumer:\n\t init\n");
+
 	count i = 1;
 
-	printf("consumer:\n\t init\n");
 	while(1)
 	{
 		//await work
