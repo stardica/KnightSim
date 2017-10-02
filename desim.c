@@ -10,6 +10,7 @@
 
 
 list *ctxdestroylist = NULL;
+
 list *ctxlist = NULL;
 list *ecdestroylist = NULL;
 
