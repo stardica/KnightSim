@@ -53,7 +53,10 @@ int main(void){
 		p_time = (RDTSC() - p_start);
 	#endif
 
-	printf("End simulation time %llu\n", p_time);
+	//Temporarily here for measurement purposes
+	desim_end();
+
+	printf("End simulation time in cycles %llu\n", p_time);
 
 	return 1;
 }
@@ -139,7 +142,7 @@ void producer(void){
 
 	printf("producer %d: exiting %llu\n", my_pid, CYCLE);
 
-	thread_context_destroy();
+	thread_context_terminate();
 
 	return;
 }

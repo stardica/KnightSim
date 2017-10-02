@@ -184,8 +184,13 @@ void *thread_control(void *thread_data){
 		if(!context_simulate(self->home))
 			thread_context_switch(self->context->buf);
 
-		//printf("thread_control(): thread has returned id %d\n", self->id);
-		//FFLUSH
+
+		//it may be time to end simulation check to see if all threads have quit...
+		if(desim_list_count(threadlist) == NUM_THREADS)
+		{
+			assert(desim_list_count(ctxlist) == 0);
+			pthread_cond_signal(&sim_end);
+		}
 	}
 
 	return NULL;
@@ -492,27 +497,30 @@ void thread_context_init(context *new_context){
 	return;
 }
 
-void thread_context_destroy(void){
+void thread_context_terminate(void){
 
 	thread *thread_ptr = thread_get_ptr(pthread_self());
 
+	thread_ptr->context = (context *)desim_list_remove(ctxdestroylist, thread_ptr->context);
+
 	//destroy the context
-	free(thread_ptr->context->name);
-	free(thread_ptr->context->stack);
-	thread_ptr->context->start = NULL;
-	free(thread_ptr->context);
+	context_destroy(thread_ptr->context);
+
 	thread_ptr->context = NULL;
 
 	//put the thread back into the thread pool
 	//deschedule thread
+
 	desim_list_enqueue(threadlist, thread_ptr);
 
+	//check for straglers (probably none...)
 	thread_launch();
 
 	context_end(thread_ptr->home);
 
 	return;
 }
+
 
 #endif
 
@@ -784,13 +792,10 @@ void simulate(void){
 	}
 
 	//clean up
-	desim_end();
+	//desim_end();
 
 	return;
 }
-
-
-
 
 void desim_pause(void){
 
@@ -804,6 +809,7 @@ void desim_end(void){
 	int i = 0;
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
+	thread *thread_ptr = NULL;
 
 	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
@@ -831,6 +837,29 @@ void desim_end(void){
 	desim_list_clear(ecdestroylist);
 	desim_list_free(ecdestroylist);
 
+#ifdef NUM_THREADS
+
+	LIST_FOR_EACH_L(threadlist, i, 0)
+	{
+		thread_ptr = (thread*)desim_list_get(threadlist, i);
+
+		if(thread_ptr)
+			thread_destroy(thread_ptr);
+	}
+
+#endif
+
+	return;
+}
+
+
+void thread_destroy(thread * thread_ptr){
+
+	thread_ptr->self = NULL;
+	thread_ptr->context = NULL;
+	thread_ptr->last_context = NULL;
+	pthread_cancel(thread_ptr->thread_handle);
+	free(thread_ptr);
 	return;
 }
 
