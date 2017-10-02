@@ -1,112 +1,202 @@
-#include <desim.h>
+#include "desim.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <string.h>
+#include "cpucounters.h"
 
 #define LOOP 3
 #define LATENCY 4
+#define NUMPAIRS 2
+#define SECOND 1000000
+#define HALFSECOND 500000
+#define QUARTERSECOND 250000
+#define MILISECOND 1000
+#define HALFMILISECOND 500
+#define QUARTERMILISECOND 250
+
+unsigned long long p_start = 0;
+unsigned long long p_time = 0;
 
 eventcount *ec_p;
 eventcount *ec_c;
 
 void producer(void);
 void consumer(void);
+void producer_init(void);
+void consumer_init(void);
+
+/*void intelpcm_init(void);*/
 
 int main(void){
 
-	char buff[100];
+
+	//init IntelPCM
+#ifdef MEASURE
+	//intelpcm_init();
+#endif
 
 	//user must initialize DESim
 	desim_init();
 
-	//create the user defined eventcounts
-	memset(buff,'\0' , 100);
-	snprintf(buff, 100, "ec_p");
-	ec_p = eventcount_create(strdup(buff));
+	producer_init();
 
-	memset(buff,'\0' , 100);
-	snprintf(buff, 100, "ec_c");
-	ec_c = eventcount_create(strdup(buff));
-	printf("Event counts created\n");
-	FFLUSH
+	consumer_init();
 
-	//create the user defined contexts
-	memset(buff,'\0' , 100);
-	snprintf(buff, 100, "producer");
-	context_create(producer, 32768, strdup(buff));
-
-	memset(buff,'\0' , 100);
-	snprintf(buff, 100, "consumer");
-	context_create(consumer, 32768, strdup(buff));
-	printf("Contexts created\n");
-	FFLUSH
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
 	printf("Simulate %d interactions\n", LOOP);
+
+	#ifdef MEASURE
+		p_start = RDTSC();
+	#endif
+
 	simulate();
-	printf("End simulation\n");
+
+	#ifdef MEASURE
+		p_time = (RDTSC() - p_start);
+	#endif
+
+	printf("End simulation time %llu\n", p_time);
 
 	return 1;
 }
 
+void producer_init(void){
+
+	int i = 0;
+	char buff[100];
+
+	//create the user defined eventcounts
+	ec_p = (eventcount *) calloc(NUMPAIRS, sizeof(eventcount));
+	for(i = 0; i < NUMPAIRS; i++)
+	{
+		memset(buff,'\0' , 100);
+		snprintf(buff, 100, "ec_p_%d", i);
+		ec_p[i] = *(eventcount_create(strdup(buff)));
+	}
+
+	//create the user defined contexts
+	for(i = 0; i < NUMPAIRS; i++)
+	{
+		memset(buff,'\0' , 100);
+		snprintf(buff, 100, "producer_%d", i);
+		context_create(producer, 32768, strdup(buff));
+	}
+
+	return;
+}
+
+void consumer_init(void){
+
+	int i = 0;
+	char buff[100];
+
+	ec_c = (eventcount *) calloc(NUMPAIRS, sizeof(eventcount));
+	for(i = 0; i < NUMPAIRS; i++)
+	{
+		memset(buff,'\0' , 100);
+		snprintf(buff, 100, "ec_c_%d", i);
+		ec_c[i] = *(eventcount_create(strdup(buff)));
+	}
+
+	for(i = 0; i < NUMPAIRS; i++)
+	{
+		memset(buff,'\0' , 100);
+		snprintf(buff, 100, "consumer_%d", i);
+		context_create(consumer, 32768, strdup(buff));
+	}
+
+	return;
+}
+
+/*
+#ifdef MEASURE
+//performance monitor
+PCM * m;
+
+CoreCounterState before_sstate, after_sstate;
+
+void intelpcm_init(void){
+
+	m = PCM::getInstance();
+
+	m->resetPMU();
+
+	PCM::ErrorCode returnResult = m->program();
+
+	if (returnResult != PCM::Success)
+	{
+		warning("Intel's PCM couldn't start\n");
+		warning("Error code: %d\n", returnResult);
+		exit(1);
+	}
+
+	return;
+}
+#endif
+*/
+
+long long p_id = 0;
+
 void producer(void){
 
-	printf("producer:\n\t init\n");
+	int my_pid = p_id++;
+	count_t i = 0;
+	count_t j = 1;
 
-	//OMG figure out who we are!!!
-	//thread *thread_ptr = thread_get_ptr(pthread_self());
-
-	count i = 0;
-	count j = 1;
+	printf("producer %d:\n\t init\n", my_pid);
 
 	while(i < LOOP)
 	{
-		/**********do work here***********/
+		//do work
+		usleep(MILISECOND);
+
 		printf("\t advancing ec_c cycle %llu\n", CYCLE);
-		advance(ec_c);
+		advance(&ec_c[my_pid]);
 
 		//fatal("producer after pause\n");
 
 		printf("\t await ec_p cycle %llu\n", CYCLE);
-		await(ec_p, j);
+		await(&ec_p[my_pid], j);
 
 		//thread_sleep(thread_ptr);
 
 		j++;
-		printf("producer:\n");
+		printf("producer %d:\n", my_pid);
 		printf("\t advanced and doing work cycle %llu\n", CYCLE);
 
 		//inc loop
 		i++;
 	}
 
-	printf("\t exiting and simulation ending cycle %llu\n", CYCLE);
+	printf("producer %d: exiting %llu\n", my_pid, CYCLE);
+
+	thread_context_destroy();
 
 	return;
 }
 
+long long c_pid = 0;
+
 void consumer(void){
 
-	printf("consumer:\n\t init\n");
+	int my_pid = c_pid++;
+	count_t i = 1;
 
-	//OMG figure out who we are!!!
-	//thread *thread_ptr = thread_get_ptr(pthread_self());
-
-	count i = 1;
+	printf("consumer %d:\n\t init\n", my_pid);
 
 	while(1)
 	{
 		//await work
 		printf("\t await ec_c cycle %llu\n", CYCLE);
-		await(ec_c, i);
+		await(&ec_c[my_pid], i);
 		i++;
-		printf("consumer:\n\t advanced and doing work cycle %llu\n", CYCLE);
+		printf("consumer %d:\n\t advanced and doing work cycle %llu\n", my_pid, CYCLE);
 
-		//thread_sleep(thread_ptr);
-
-
-		/**********do work here***********/
+		//do work
+		usleep(MILISECOND);
 
 		//charge latency
 		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
@@ -115,7 +205,7 @@ void consumer(void){
 
 		/*advance producer ctx*/
 		printf("\t advancing ec_p cycle %llu\n", CYCLE);
-		advance(ec_p);
+		advance(&ec_p[my_pid]);
 	}
 
 	fatal("consumer should never exit cycle %llu\n", CYCLE);

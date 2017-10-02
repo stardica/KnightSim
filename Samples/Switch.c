@@ -33,7 +33,7 @@ void switch_io_ctrl(void){
 
 	//int my_pid = switch_io_pid++;
 
-	count step = 1;
+	count_t step = 1;
 	int i = 0;
 	int num_packets = 0;
 	packet *net_packet = NULL;
@@ -49,7 +49,7 @@ void switch_io_ctrl(void){
 		//just an exmple clear one packet out of each queue
 		for(i = 0 ; i < __switch->num_ports; i++)
 		{
-			net_packet = desim_list_remove_at(__switch->tx_request_queues[i], 0);
+			net_packet = (packet *)desim_list_remove_at(__switch->tx_request_queues[i], 0);
 
 			if(net_packet)
 			{
@@ -57,7 +57,7 @@ void switch_io_ctrl(void){
 				num_packets++;
 			}
 
-			net_packet = desim_list_remove_at(__switch->tx_reply_queues[i], 0);
+			net_packet = (packet *)desim_list_remove_at(__switch->tx_reply_queues[i], 0);
 
 			if(net_packet)
 			{
@@ -79,7 +79,7 @@ void switch_ctrl(void){
 
 	int my_pid = switch_pid++;
 
-	count step = 1;
+	count_t step = 1;
 
 	int i = 0;
 	packet *net_packet = NULL;
@@ -114,7 +114,7 @@ void switch_ctrl(void){
 				move the packet from the input queue to the correct output queue*/
 
 				//careful here, the next line is for the INPUT queue...
-				net_packet = desim_list_remove_at(switch_get_rx_queue(__switch, crossbar_get_port_link_status(__switch)), 0);
+				net_packet = (packet *)desim_list_remove_at(switch_get_rx_queue(__switch, crossbar_get_port_link_status(__switch)), 0);
 				assert(net_packet);
 
 				//get a pointer to the output queue
@@ -280,13 +280,13 @@ crossbar *switch_crossbar_create(struct switch_t *__switch){
 
 	crossbar *crossbar_ptr;
 
-	crossbar_ptr = (void *) malloc(sizeof(crossbar));
+	crossbar_ptr = (crossbar *) malloc(sizeof(crossbar));
 
 	//set up the cross bar variables
 	crossbar_ptr->num_ports = __switch->num_ports;
 	crossbar_ptr->num_links = 0;
 
-	crossbar_ptr->out_port_linked_queues = (void *) calloc(crossbar_ptr->num_ports, sizeof(enum port_name));
+	crossbar_ptr->out_port_linked_queues = (enum port_name *) calloc(crossbar_ptr->num_ports, sizeof(enum port_name));
 
 	for(i = 0 ; i < crossbar_ptr->num_ports; i++)
 	{
@@ -385,7 +385,7 @@ enum port_name switch_get_packet_route(struct switch_t *__switch, packet *net_pa
 
 	//a real switch simulation would model a much more complicated routing algorithm here
 
-	tx_port = net_packet->dest + 1;
+	tx_port = (enum port_name)(net_packet->dest + 1);
 
 	assert(tx_port > 0 && tx_port <= __switch->num_ports);
 	return tx_port;
@@ -401,10 +401,10 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 	switch(__switch->next_crossbar_lane)
 	{
 		case crossbar_request:
-			net_packet = desim_list_get(__switch->rx_request_queues[__switch->current_queue - 1], 0);
+			net_packet = (packet *)desim_list_get(__switch->rx_request_queues[__switch->current_queue - 1], 0);
 			break;
 		case crossbar_reply:
-			net_packet = desim_list_get(__switch->rx_reply_queues[__switch->current_queue - 1], 0);
+			net_packet = (packet *)desim_list_get(__switch->rx_reply_queues[__switch->current_queue - 1], 0);
 			break;
 		case crossbar_invalid_lane:
 		default:
@@ -418,7 +418,7 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 void producer_ctrl(void){
 
 	int my_pid = producer_pid;
-	enum port_name port = producer_pid; //determine who I am 0-5
+	enum port_name port = (enum port_name)producer_pid; //determine who I am 0-5
 	producer_pid++;
 	int i = 0;
 
@@ -488,12 +488,12 @@ packet *network_packet_create(int type, int dest){
 
 	packet *new_packet = NULL;
 
-	new_packet = (void *) calloc((1), sizeof(packet));
+	new_packet = (packet *) calloc((1), sizeof(packet));
 	assert(new_packet);
 
 	//if 1 make packet a request packet
-	new_packet->type = type;
-	new_packet->dest = dest;
+	new_packet->type = (enum type_name)type;
+	new_packet->dest = (enum port_name)dest;
 
 	if(type == request)
 		new_packet->size = 8;
@@ -545,7 +545,7 @@ void switch_init(void){
 	context_create(switch_io_ctrl, 32768, strdup(buff));
 
 	//create the switch
-	__switch = (void *) calloc((1), sizeof(struct switch_t));
+	__switch = (struct switch_t *) calloc((1), sizeof(struct switch_t));
 
 	memset (buff,'\0' , 100);
 	snprintf(buff, 100, "switch[%d]", switch_id);
@@ -560,10 +560,10 @@ void switch_init(void){
 	__switch->arb_style = round_robin;
 
 	//create switch virtual queues...
-	__switch->rx_request_queues = (void *) calloc((__switch->num_ports), sizeof(list));
-	__switch->rx_reply_queues = (void *) calloc((__switch->num_ports), sizeof(list));
-	__switch->tx_request_queues = (void *) calloc((__switch->num_ports), sizeof(list));
-	__switch->tx_reply_queues = (void *) calloc((__switch->num_ports), sizeof(list));
+	__switch->rx_request_queues = (list **) calloc((__switch->num_ports), sizeof(list));
+	__switch->rx_reply_queues = (list **) calloc((__switch->num_ports), sizeof(list));
+	__switch->tx_request_queues = (list **) calloc((__switch->num_ports), sizeof(list));
+	__switch->tx_reply_queues = (list **) calloc((__switch->num_ports), sizeof(list));
 
 	//allocate the queues...
 	for(i = 0; i < __switch->num_ports; i++)

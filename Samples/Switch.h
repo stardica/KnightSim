@@ -21,9 +21,6 @@
 #define EXIT_SUB_CLOCK if (etime->count & 0x1) pause(1);
 
 
-typedef struct crossbar_t crossbar;
-typedef struct packet_t packet;
-
 enum arbitrate{
 	round_robin = 0,
 	prioity
@@ -64,11 +61,8 @@ struct crossbar_t{
 
 	int num_ports;
 	int num_links;
-
 	enum port_name current_port;
-
 	enum port_name *out_port_linked_queues;
-
 };
 
 
@@ -85,7 +79,7 @@ struct switch_t{
 	enum port_name current_queue;
 
 	//crossbar
-	crossbar *crossbar;
+	crossbar_t *crossbar;
 
 	enum switch_crossbar_lane_map next_crossbar_lane;
 	enum switch_io_lane_map north_next_io_lane;
@@ -119,15 +113,19 @@ struct packet_t{
 };
 
 
+typedef struct crossbar_t crossbar;
+typedef struct packet_t packet;
+
+
 struct switch_t *__switch;
 
 eventcount *switch_ec;
 eventcount *switch_io_ec;
 
-int switch_id;
+/*int switch_id;
 int producer_pid;
 int switch_pid;
-int switch_io_pid;
+int switch_io_pid;*/
 
 void producer_init(void);
 void switch_init(void);

@@ -7,6 +7,8 @@
 #define LOOP 3
 #define LATENCY 4
 
+#define CYCLE etime->count
+
 #define P_TIME (etime->count >> 1)
 #define P_PAUSE(p_delay) pause((p_delay)<<1)
 
@@ -157,7 +159,7 @@ void producer_b(void){
 
 void arbiter(void){
 
-	count i = 1;
+	count_t i = 1;
 
 	printf("arbiter:\n\t init\n");
 	while(1)
@@ -219,7 +221,7 @@ void arbiter(void){
 
 void consumer(void){
 
-	count i = 1;
+	count_t i = 1;
 
 	printf("consumer:\n\t init\n");
 	while(1)

@@ -7,36 +7,41 @@
 #include <assert.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
-
+/* Globals*/
 list *ctxdestroylist = NULL;
 list *ctxlist = NULL;
 list *ecdestroylist = NULL;
+list *threadlist = NULL;
 
 context *last_context = NULL;
 context *current_context = NULL;
 context *ctxhint = NULL;
+context *curctx = NULL;
+context *terminated_context = NULL;
+
 eventcount *etime = NULL;
 
+pthread_mutex_t threads_created_mutex;
+pthread_cond_t thread_created;
+pthread_mutex_t sim_end_mutex;
+pthread_cond_t sim_end;
+pthread_mutex_t thread_launch_mutex;
+
+//for quick look up
+#ifdef NUM_THREADS
+	#define HASHSIZE (NUM_THREADS + 23)
+	thread *thread_hash_table[HASHSIZE];
+#endif
+
+jmp_buf main_context;
+
+count_t thread_count = 0;
 
 long long ecid = 0;
 long long ctxid = 0;
 long long threadid = 0;
-
-
-context *terminated_context = NULL;
-
-pthread_mutex_t threads_created_mutex;
-pthread_cond_t thread_created;
-
-pthread_mutex_t sim_end_mutex;
-pthread_cond_t sim_end;
-
-pthread_mutex_t thread_launch_mutex;
-
-count thread_count = 0;
-
-
 
 void desim_init(void){
 
@@ -72,8 +77,9 @@ void thread_pool_create(void){
 	thread *new_thread = NULL;
 
 	pthread_mutex_init(&threads_created_mutex, NULL);
-	pthread_cond_init (&thread_created, NULL);
-
+	pthread_cond_init(&thread_created, NULL);
+	pthread_mutex_init(&sim_end_mutex, NULL);
+	pthread_cond_init(&sim_end, NULL);
 	pthread_mutex_init(&thread_launch_mutex, NULL);
 
 	threadlist = desim_list_create(NUM_THREADS);
@@ -138,7 +144,7 @@ void thread_init(thread *new_thread){
 	pthread_cond_init (&new_thread->run, NULL);
 	pthread_mutex_init(&new_thread->pause_mutex, NULL);
 	pthread_cond_init (&new_thread->pause, NULL);
-	new_thread->return_val = pthread_create(&new_thread->thread_handle, NULL, (void *)thread_control, (void *) new_thread);
+	new_thread->return_val = pthread_create(&new_thread->thread_handle, NULL, &thread_control, (void*)new_thread);
 
 	return;
 }
@@ -150,7 +156,11 @@ void thread_sync(thread *thread_ptr){
 	return;
 }
 
-void thread_control(thread *self){
+void *thread_control(void *thread_data){
+
+	thread *self = (thread *)thread_data;
+
+	//thread_set_affinity(self->id);
 
 	//signal main if this is the last thread
 	pthread_mutex_lock(&threads_created_mutex);
@@ -178,10 +188,10 @@ void thread_control(thread *self){
 		//FFLUSH
 	}
 
-	return;
+	return NULL;
 }
 
-void thread_await(eventcount *ec, count value){
+void thread_await(eventcount *ec, count_t value){
 
 	//OMG! figure out who we are!!!
 	thread *thread_ptr = thread_get_ptr(pthread_self());
@@ -211,7 +221,7 @@ void thread_await(eventcount *ec, count value){
 	//printf("thread_await(): halting ec->count %d val %d id %d\n", (int) ec->count, (int) value, thread_ptr->id);
 	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_get(ec->ctxlist, i);
+		context_ptr = (context*)desim_list_get(ec->ctxlist, i);
 		if(!context_ptr || (context_ptr && value < context_ptr->count))
 		{
 			/*we are at the head or tail of the list
@@ -243,12 +253,12 @@ void thread_await(eventcount *ec, count value){
 		to advance in cycles pull all contexts that are ready
 		to run from etime's ctx list and launch threads*/
 
-		pthread_mutex_unlock(&thread_launch_mutex);
-		if(desim_list_count(ctxlist) == 0 && desim_list_count(threadlist) == 32)
+		pthread_mutex_lock(&thread_launch_mutex);
+		if(desim_list_count(ctxlist) == 0 && desim_list_count(threadlist) == NUM_THREADS)
 		{
 			thread_etime_launch();
 		}
-		pthread_mutex_lock(&thread_launch_mutex);
+		pthread_mutex_unlock(&thread_launch_mutex);
 
 		context_end(thread_ptr->home);
 	}
@@ -259,6 +269,7 @@ void thread_await(eventcount *ec, count value){
 }
 
 void thread_advance(eventcount *ec){
+
 
 	int i = 0;
 
@@ -275,20 +286,23 @@ void thread_advance(eventcount *ec){
 	 * and set all ctx time to current time (etime.cout)*/
 	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_get(ec->ctxlist, i);
+		context_ptr = (context*)desim_list_get(ec->ctxlist, i);
 
 		if(context_ptr && (context_ptr->count == ec->count))
 		{
 			assert(context_ptr->count == ec->count);
 			context_ptr->count = etime->count;
-			context_ptr = desim_list_dequeue(ec->ctxlist);
+			context_ptr = (context*)desim_list_dequeue(ec->ctxlist);
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
 		else
 		{
 			//no context or context is not ready to run
 			if(context_ptr)
+			{
+				warning("context_ptr->count %llu > ec->count %llu\n", context_ptr->count, ec->count);
 				assert(context_ptr->count > ec->count);
+			}
 			break;
 		}
 	}
@@ -299,7 +313,7 @@ void thread_advance(eventcount *ec){
 	return;
 }
 
-void thread_pause(count value){
+void thread_pause(count_t value){
 
 	return;
 }
@@ -317,22 +331,22 @@ void thread_etime_launch(void){
 	//no mutex needed, as all threads have stopped.
 	thread *thread_ptr = NULL;
 	context *context_ptr = NULL;
-	count next_ctx_count = 0;
+	count_t next_ctx_count = 0;
 	int i = 0;
 
 	//remove the first context from the etime's ctxlist
-	context_ptr = desim_list_dequeue(etime->ctxlist);
+	context_ptr = (context*)desim_list_dequeue(etime->ctxlist);
 	next_ctx_count = context_ptr->count;
 	desim_list_enqueue(ctxlist, context_ptr);
 
 	//Pull any other contexts that have the same count as the first
 	LIST_FOR_EACH_L(etime->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_get(etime->ctxlist, i);
+		context_ptr = (context*)desim_list_get(etime->ctxlist, i);
 
 		if(context_ptr && (next_ctx_count == context_ptr->count))
 		{
-			context_ptr = desim_list_remove(etime->ctxlist, context_ptr);
+			context_ptr = (context*)desim_list_remove(etime->ctxlist, context_ptr);
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
 		else
@@ -347,8 +361,8 @@ void thread_etime_launch(void){
 	signal the thread to run the context*/
 	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
 	{
-		thread_ptr = desim_list_dequeue(threadlist);
-		context_ptr = desim_list_dequeue(ctxlist);
+		thread_ptr = (thread*)desim_list_dequeue(threadlist);
+		context_ptr = (context*)desim_list_dequeue(ctxlist);
 		assert(thread_ptr && context_ptr);
 
 		//warning("thread_launch(): thread %d assigned ctx id %d\n", thread_ptr->id, context_ptr->id);
@@ -369,14 +383,17 @@ void thread_launch(void){
 	thread *thread_ptr = NULL;
 	context *context_ptr = NULL;
 
+	//printf("working\n");
+
 	/*pull a thread from the threads list assign it a context and
 	signal the thread to run the context*/
-	pthread_mutex_unlock(&thread_launch_mutex);
-	assert(desim_list_count(threadlist) != 0);
+	pthread_mutex_lock(&thread_launch_mutex);
+
+	//printf("problem here\n");
 	while(desim_list_count(threadlist) && desim_list_count(ctxlist))
 	{
-		thread_ptr = desim_list_dequeue(threadlist);
-		context_ptr = desim_list_dequeue(ctxlist);
+		thread_ptr = (thread*)desim_list_dequeue(threadlist);
+		context_ptr = (context*)desim_list_dequeue(ctxlist);
 		assert(thread_ptr && context_ptr);
 
 		//warning("thread_launch(): thread %d assigned ctx id %d\n", thread_ptr->id, context_ptr->id);
@@ -388,10 +405,29 @@ void thread_launch(void){
 
 		pthread_cond_signal(&thread_ptr->run);
 	}
-	pthread_mutex_lock(&thread_launch_mutex);
+	pthread_mutex_unlock(&thread_launch_mutex);
 
 	return;
 
+}
+
+
+int thread_set_affinity(int core_id){
+
+	int err = 0;
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	if (core_id < 0 || core_id >= num_cores)
+	  return err = 1;
+
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(core_id, &cpuset);
+
+	pthread_t current_thread = pthread_self();
+	pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+	assert(err == 0);
+
+   return err;
 }
 
 thread *thread_get_ptr(pthread_t thread_handle){
@@ -455,6 +491,29 @@ void thread_context_init(context *new_context){
 
 	return;
 }
+
+void thread_context_destroy(void){
+
+	thread *thread_ptr = thread_get_ptr(pthread_self());
+
+	//destroy the context
+	free(thread_ptr->context->name);
+	free(thread_ptr->context->stack);
+	thread_ptr->context->start = NULL;
+	free(thread_ptr->context);
+	thread_ptr->context = NULL;
+
+	//put the thread back into the thread pool
+	//deschedule thread
+	desim_list_enqueue(threadlist, thread_ptr);
+
+	thread_launch();
+
+	context_end(thread_ptr->home);
+
+	return;
+}
+
 #endif
 
 eventcount *eventcount_create(char *name){
@@ -471,6 +530,7 @@ eventcount *eventcount_create(char *name){
 
 	return ec_ptr;
 }
+
 
 
 
@@ -508,7 +568,7 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 	return;
 }
 
-void eventcount_init(eventcount * ec, count count, char *ecname){
+void eventcount_init(eventcount * ec, count_t count, char *ecname){
 
 	ec->name = ecname;
 	ec->id = ecid++;
@@ -538,7 +598,7 @@ void advance(eventcount *ec){
 	 * and set all ctx time to current time (etime.cout)*/
 	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
 
 
 		if(context_ptr && (context_ptr->count == ec->count))
@@ -547,7 +607,7 @@ void advance(eventcount *ec){
 			//fflush(stdout);
 			assert(context_ptr->count == ec->count);
 			context_ptr->count = etime->count;
-			context_ptr = desim_list_dequeue(ec->ctxlist);
+			context_ptr = (context *)desim_list_dequeue(ec->ctxlist);
 			desim_list_enqueue(ctxlist, context_ptr);
 		}
 		else
@@ -572,8 +632,8 @@ void context_terminate(void){
 	context *ctx_ptr = NULL;
 
 	/*remove from global ctx and destroy lists*/
-	ctx_ptr = desim_list_dequeue(ctxlist);
-	ctx_ptr = desim_list_remove(ctxdestroylist, ctx_ptr);
+	ctx_ptr = (context*)desim_list_dequeue(ctxlist);
+	ctx_ptr = (context*)desim_list_remove(ctxdestroylist, ctx_ptr);
 	assert(last_context == ctx_ptr);
 
 	context_destroy(ctx_ptr);
@@ -586,6 +646,8 @@ void context_terminate(void){
 
 	return;
 }
+
+
 
 
 void context_destroy(context *ctx_ptr){
@@ -612,7 +674,7 @@ void eventcount_destroy(eventcount *ec_ptr){
 }
 
 
-void pause(count value){
+void pause(count_t value){
 
 #ifdef NUM_THREADS
 	thread_await(etime, etime->count + value);
@@ -626,13 +688,13 @@ void pause(count value){
 context *context_select(void){
 
 	/*get next ctx to run*/
-	current_context = desim_list_get(ctxlist, 0);
+	current_context = (context*)desim_list_get(ctxlist, 0);
 
 	if(!current_context)
 	{
 		/*if there isn't a ctx on the global context list
 		we are ready to advance in cycles, pull from etime*/
-		current_context = desim_list_dequeue(etime->ctxlist);
+		current_context = (context*)desim_list_dequeue(etime->ctxlist);
 
 		/*if there isn't a ctx in etime's ctx list the simulation is
 		deadlocked this is a user simulation implementation problem*/
@@ -655,7 +717,7 @@ context *context_select(void){
 
 
 
-void await(eventcount *ec, count value){
+void await(eventcount *ec, count_t value){
 
 	/*todo
 	check for stack overflows*/
@@ -683,12 +745,12 @@ void await(eventcount *ec, count value){
 
 	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
 	{
-		context_ptr = desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
 		if(!context_ptr || (context_ptr && value < context_ptr->count))
 		{
 			/*we are at the head or tail of the list
 			insert ctx at this position*/
-			context_ptr = desim_list_dequeue(ctxlist);
+			context_ptr = (context *)desim_list_dequeue(ctxlist);
 
 			//set the curctx's value
 			context_ptr->count = value;
@@ -745,7 +807,7 @@ void desim_end(void){
 
 	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
-		ec_ptr = desim_list_get(ecdestroylist, i);
+		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
 
 		if(ec_ptr)
 			eventcount_destroy(ec_ptr);
@@ -754,7 +816,7 @@ void desim_end(void){
 
 	LIST_FOR_EACH_L(ctxdestroylist, i, 0)
 	{
-		ctx_ptr = desim_list_get(ctxdestroylist, i);
+		ctx_ptr = (context*)desim_list_get(ctxdestroylist, i);
 
 		if(ctx_ptr)
 			context_destroy(ctx_ptr);
@@ -874,9 +936,9 @@ list *desim_list_create(unsigned int size)
 	list *new_list;
 
 	/* Create vector of elements */
-	new_list = calloc(1, sizeof(list));
+	new_list = (list*)calloc(1, sizeof(list));
 	new_list->size = size < 4 ? 4 : size;
-	new_list->elem = calloc(new_list->size, sizeof(void *));
+	new_list->elem = (void**)calloc(new_list->size, sizeof(void *));
 
 	/* Return list */
 	return new_list;
@@ -904,7 +966,7 @@ void desim_list_grow(list *list_ptr)
 
 	/* Create new array */
 	nsize = list_ptr->size * 2;
-	nelem = calloc(nsize, sizeof(void *));
+	nelem = (void**)calloc(nsize, sizeof(void *));
 
 	/* Copy contents to new array */
 	for (i = list_ptr->head, index = 0;
