@@ -13,6 +13,7 @@ LINKER_FLAGS_32 = -static -lDESim32 -lpthread
 LIB_NAME_64 = "libDESim64.a"
 LIB_NAME_32 = "libDESim32.a"
 
+
 #Samples
 DESIM_INC = ./
 DESIM_LIB = ./
