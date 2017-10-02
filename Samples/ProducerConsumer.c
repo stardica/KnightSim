@@ -26,15 +26,11 @@ void consumer(void);
 void producer_init(void);
 void consumer_init(void);
 
-/*void intelpcm_init(void);*/
+long long p_id = 0;
+long long c_pid = 0;
+
 
 int main(void){
-
-
-	//init IntelPCM
-#ifdef MEASURE
-	//intelpcm_init();
-#endif
 
 	//user must initialize DESim
 	desim_init();
@@ -42,7 +38,6 @@ int main(void){
 	producer_init();
 
 	consumer_init();
-
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
@@ -111,35 +106,6 @@ void consumer_init(void){
 	return;
 }
 
-/*
-#ifdef MEASURE
-//performance monitor
-PCM * m;
-
-CoreCounterState before_sstate, after_sstate;
-
-void intelpcm_init(void){
-
-	m = PCM::getInstance();
-
-	m->resetPMU();
-
-	PCM::ErrorCode returnResult = m->program();
-
-	if (returnResult != PCM::Success)
-	{
-		warning("Intel's PCM couldn't start\n");
-		warning("Error code: %d\n", returnResult);
-		exit(1);
-	}
-
-	return;
-}
-#endif
-*/
-
-long long p_id = 0;
-
 void producer(void){
 
 	int my_pid = p_id++;
@@ -177,8 +143,6 @@ void producer(void){
 
 	return;
 }
-
-long long c_pid = 0;
 
 void consumer(void){
 
