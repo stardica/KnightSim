@@ -237,8 +237,10 @@ void thread_await(eventcount *ec, count_t value){
 
 			//printf("thread_await(): context removed and added to ec id %d\n", thread_ptr->id);
 			//set the curctx's value
+			//desim_dump_queues();
 			thread_ptr->context->count = value;
 			desim_list_insert(ec->ctxlist, i, thread_ptr->context);
+			//desim_dump_queues();
 			break;
 		}
 	}
@@ -364,6 +366,8 @@ void thread_etime_launch(void){
 	context *context_ptr = NULL;
 	count_t next_ctx_count = 0;
 	int i = 0;
+
+	printf("***********ETIME LAUNCH***************\n");
 
 	//remove the first context from the etime's ctxlist
 	context_ptr = (context*)desim_list_dequeue(etime->ctxlist);
@@ -561,6 +565,7 @@ void thread_context_init(context *new_context){
 	return;
 }
 
+
 void thread_context_terminate(void){
 
 	thread *thread_ptr = thread_get_ptr(pthread_self());
@@ -579,7 +584,11 @@ void thread_context_terminate(void){
 	desim_list_enqueue(threadlist, thread_ptr);
 	//check for stragglers (probably none...)
 
+	printf("size of ecdestroylist %d\n", desim_list_count(ecdestroylist));
+
 	printf("term %d and %d\n", desim_list_count(threadlist), desim_list_count(ctxlist));
+
+	desim_dump_queues();
 
 	if(NUM_THREADS == 1 && desim_list_count(ctxlist) > 0)
 	{
@@ -594,14 +603,41 @@ void thread_context_terminate(void){
 		thread_launch();
 		context_end(thread_ptr->home);
 	}
+	return;
+}
+#endif
+
+
+void desim_dump_queues(void){
+
+	int i = 0;
+	int j = 0;
+	eventcount *ec_ptr = NULL;
+	context *ctx_ptr = NULL;
+
+	printf("desim_dump_queues():\n");
+
+	printf("eventcounts\n");
+	LIST_FOR_EACH_L(ecdestroylist, i, 0)
+	{
+		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
+
+		printf("ec name %s count %llu\n", ec_ptr->name, ec_ptr->count);
+		LIST_FOR_EACH_L(ec_ptr->ctxlist, j, 0)
+		{
+			ctx_ptr = (context *)desim_list_get(ec_ptr->ctxlist, j);
+			printf("\tslot %d ctx %s ec count %llu ctx count %llu\n",
+					j, ctx_ptr->name, ec_ptr->count, ctx_ptr->count);
+		}
+
+	}
+	printf("\n");
 
 
 
 	return;
 }
 
-
-#endif
 
 eventcount *eventcount_create(char *name){
 
@@ -618,10 +654,7 @@ eventcount *eventcount_create(char *name){
 	return ec_ptr;
 }
 
-
-
-
-void context_create(void (*func)(void), unsigned stacksize, char *name){
+void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
 
 	/*stacksize should be multiple of unsigned size */
 	assert ((stacksize % sizeof(unsigned)) == 0);
@@ -633,9 +666,10 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 
 	new_context_ptr->count = etime->count;
 	new_context_ptr->name = name;
-	new_context_ptr->id = ctxid++;
+	new_context_ptr->id = id;
 	new_context_ptr->stack = (char *)malloc(stacksize);
 	assert(new_context_ptr->stack);
+	/*printf("ptr 0x%08llx\n", (long long)new_context_ptr->stack);*/
 	new_context_ptr->stacksize = stacksize;
 	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
 	new_context_ptr->start = func; /*assigns the head of a function*/
@@ -650,7 +684,7 @@ void context_create(void (*func)(void), unsigned stacksize, char *name){
 	desim_list_insert(ctxlist, 0, new_context_ptr);
 
 	//for destroying the context later
-	desim_list_insert(ctxdestroylist, 0, new_context_ptr);
+	desim_list_enqueue(ctxdestroylist, new_context_ptr);
 
 	return;
 }
@@ -716,33 +750,44 @@ void context_terminate(void){
 	/*we are deliberately allowing a context to terminate it self
 	destroy the context and switch to the next context*/
 
-	context *ctx_ptr = NULL;
+	context *ctx_ptr_1 = NULL;
+	//context *ctx_ptr_2 = NULL;
 
 	/*remove from global ctx and destroy lists*/
-	ctx_ptr = (context*)desim_list_dequeue(ctxlist);
-	ctx_ptr = (context*)desim_list_remove(ctxdestroylist, ctx_ptr);
-	assert(last_context == ctx_ptr);
+	ctx_ptr_1 = (context*)desim_list_remove_at(ctxlist, 0);
+	printf("name %s count %llu\n", ctx_ptr_1->name, ctx_ptr_1->count);
 
-	context_destroy(ctx_ptr);
+	//ctx_ptr_2 = (context*)desim_list_remove(ctxdestroylist, ctx_ptr_1);
+	//printf("name %s count %llu\n", ctx_ptr_2->name, ctx_ptr_2->count);
+
+	//assert(last_context == ctx_ptr_2);
+	//assert(ctx_ptr_2 != NULL);
+
+	ctx_ptr_1 = NULL;
+	//context_destroy(ctx_ptr_2);
 
 	/*Its ok to leave the eventcount,
 	 * it will be destroyed on exit*/
 
 	/*switch to next context simulation should continue*/
+	printf("HEre\n");
 	context_switch(context_select());
 
 	return;
 }
 
 
-
-
 void context_destroy(context *ctx_ptr){
 
-	free(ctx_ptr->name);
+	printf("name %s count %llu\n", ctx_ptr->name, ctx_ptr->count);
+
+	assert(ctx_ptr != NULL);
 	free(ctx_ptr->stack);
-	ctx_ptr->start = NULL;
+	free(ctx_ptr->name);
+	/*printf("ptr 0x%08llx\n", (long long)ctx_ptr->stack);*/
+
 	free(ctx_ptr);
+	ctx_ptr->start = NULL;
 	ctx_ptr = NULL;
 
 	return;
@@ -774,32 +819,104 @@ void pause(count_t value){
 
 context *context_select(void){
 
+	long long next_ctx_count = 0;
+	int i = 0;
+	int size = 0;
+
 	/*get next ctx to run*/
 	current_context = (context*)desim_list_get(ctxlist, 0);
 
 	if(!current_context)
 	{
+		printf("***********ETIME LAUNCH***************\n\n");
+
+		/*LIST_FOR_EACH_L(etime->ctxlist, i, 0)
+		{
+			current_context = (context*)desim_list_get(etime->ctxlist, i);
+
+			printf("ctx name %s count %llu\n", current_context->name, current_context->count);
+		}*/
+
 		/*if there isn't a ctx on the global context list
 		we are ready to advance in cycles, pull from etime*/
 		current_context = (context*)desim_list_dequeue(etime->ctxlist);
+		/*printf("(1): name %s count %llu\n", current_context->name, current_context->count);*/
 
-		/*if there isn't a ctx in etime's ctx list the simulation is
-		deadlocked this is a user simulation implementation problem*/
-		if(!current_context)
+		//put all ready ctx from etime to ctxlist
+		if(current_context)
 		{
+			next_ctx_count = current_context->count;
+			/*put at head of ec's ctx list*/
+			/*printf("(2): name %s count %llu\n", current_context->name, current_context->count);*/
+			desim_list_insert(ctxlist, 0, current_context);
+			/*printf("(3): name %s count %llu\n", current_context->name, current_context->count);
+			printf("inserted\n");
+			LIST_FOR_EACH_L(ctxlist, i, 0)
+			{
+
+				current_context = (context*)desim_list_get(ctxlist, i);
+				printf("\tctx name %s count %llu\n", current_context->name, current_context->count);
+			}*/
+
+			//Pull any other contexts that have the same count as the first
+			/*printf("(4): size %d\n", desim_list_count(etime->ctxlist));*/
+			size = desim_list_count(etime->ctxlist);
+
+			/*printf("size %d\n", size);*/
+
+			for(i = 0; i < size; i++)
+			{
+				current_context = (context*)desim_list_get(etime->ctxlist, 0);
+				/*printf("(Loop %d): name %s count %llu\n", i, current_context->name, current_context->count);*/
+
+				if(current_context && (next_ctx_count == current_context->count))
+				{
+					/*printf("here\n");*/
+					current_context = (context*)desim_list_remove(etime->ctxlist, current_context);
+					/*put at head of ec's ctx list*/
+					desim_list_insert(ctxlist, 0, current_context);
+				}
+				else
+				{
+				 break;
+				}
+			}
+
+			/*printf("out of loop\n");
+
+			printf("\n");
+			LIST_FOR_EACH_L(etime->ctxlist, i, 0)
+			{
+				current_context = (context*)desim_list_get(etime->ctxlist, i);
+				printf("ctx name %s count %llu\n", current_context->name, current_context->count);
+			}
+
+			printf("\n");
+			LIST_FOR_EACH_L(ctxlist, i, 0)
+			{
+				current_context = (context*)desim_list_get(ctxlist, i);
+
+				printf("ctx name %s count %llu\n", current_context->name, current_context->count);
+			}
+
+			getchar();*/
+
+			//etime is now the current cycle count determined by the ctx's count
+			current_context = (context*)desim_list_get(ctxlist, 0);
+			etime->count = current_context->count;
+
+		}
+		else
+		{
+			/*if there isn't a ctx in etime's ctx list the simulation is
+					deadlocked this is a user simulation implementation problem*/
 			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
 					"Simulation has either ended or there is a problem with the simulation implementation.\n");
 			context_end(main_context);
 		}
-
-		/*put at head of ec's ctx list*/
-		desim_list_insert(ctxlist, 0, current_context);
 	}
 
-	//etime is now the current cycle count determined by the ctx's count
-  	etime->count = current_context->count;
-
-  	return current_context;
+	return current_context;
 }
 
 
@@ -888,7 +1005,6 @@ void desim_end(void){
 	int i = 0;
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
-	thread *thread_ptr = NULL;
 
 	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
@@ -917,6 +1033,8 @@ void desim_end(void){
 	desim_list_free(ecdestroylist);
 
 #ifdef NUM_THREADS
+
+	thread *thread_ptr = NULL;
 
 	LIST_FOR_EACH_L(threadlist, i, 0)
 	{

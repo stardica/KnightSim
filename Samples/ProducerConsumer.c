@@ -5,21 +5,22 @@
 #include <string.h>
 #include "cpucounters.h"
 
-#define LOOP 100
+#define LOOP 4
 #define LATENCY 4
-#define NUMPAIRS 100
+#define NUMPAIRS 2
 #define SECOND 1000000
 #define HALFSECOND 500000
 #define QUARTERSECOND 250000
-#define MILISECOND 1000
+#define TWOMILLISECOND 2000
+#define ONEMILLISECOND 1000
 #define HALFMILISECOND 500
 #define QUARTERMILISECOND 250
 
 unsigned long long p_start = 0;
 unsigned long long p_time = 0;
 
-eventcount *ec_p;
-eventcount *ec_c;
+eventcount **ec_p;
+eventcount **ec_c;
 
 void producer(void);
 void consumer(void);
@@ -67,12 +68,12 @@ void producer_init(void){
 	char buff[100];
 
 	//create the user defined eventcounts
-	ec_p = (eventcount *) calloc(NUMPAIRS, sizeof(eventcount));
+	ec_p = (eventcount**) calloc(NUMPAIRS, sizeof(eventcount*));
 	for(i = 0; i < NUMPAIRS; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "ec_p_%d", i);
-		ec_p[i] = *(eventcount_create(strdup(buff)));
+		ec_p[i] = eventcount_create(strdup(buff));
 	}
 
 	//create the user defined contexts
@@ -80,7 +81,7 @@ void producer_init(void){
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "producer_%d", i);
-		context_create(producer, 32768, strdup(buff));
+		context_create(producer, 32768, strdup(buff), i);
 	}
 
 	return;
@@ -91,19 +92,19 @@ void consumer_init(void){
 	int i = 0;
 	char buff[100];
 
-	ec_c = (eventcount *) calloc(NUMPAIRS, sizeof(eventcount));
+	ec_c = (eventcount**) calloc(NUMPAIRS, sizeof(eventcount*));
 	for(i = 0; i < NUMPAIRS; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "ec_c_%d", i);
-		ec_c[i] = *(eventcount_create(strdup(buff)));
+		ec_c[i] = eventcount_create(strdup(buff));
 	}
 
 	for(i = 0; i < NUMPAIRS; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "consumer_%d", i);
-		context_create(consumer, 32768, strdup(buff));
+		context_create(consumer, 32768, strdup(buff), i);
 	}
 
 	return;
@@ -111,9 +112,13 @@ void consumer_init(void){
 
 void producer(void){
 
-	desim_mutex_lock();
+#ifdef NUM_THREADS
+	thread *thread_ptr = thread_get_ptr(pthread_self());
+	int my_pid = thread_ptr->context->id;
+#else
 	int my_pid = p_pid++;
-	desim_mutex_unlock();
+#endif
+
 
 	count_t i = 0;
 	count_t j = 1;
@@ -122,19 +127,17 @@ void producer(void){
 
 	while(i < LOOP)
 	{
-		printf("------LOOP %llu------\n", i);
-
-
 		//do work
-		usleep(MILISECOND);
+		usleep(TWOMILLISECOND);
 
-		printf("\t advancing %s cycle %llu\n", ec_c[my_pid].name, CYCLE);
-		advance(&ec_c[my_pid]);
+		printf("\t advancing %s cycle %llu\n", ec_c[my_pid]->name, CYCLE);
+		advance(ec_c[my_pid]);
+		//printf("before ec name %s count %llu\n", ec_c[my_pid]->name, ec_c[my_pid]->count);
 
-		//fatal("producer after pause\n");
+		//printf("after ec name %s count %llu\n", ec_c[my_pid]->name, ec_c[my_pid]->count);
 
-		printf("\t await %s cycle %llu\n", ec_p[my_pid].name, CYCLE);
-		await(&ec_p[my_pid], j);
+		printf("\t await %s cycle %llu\n", ec_p[my_pid]->name, CYCLE);
+		await(ec_p[my_pid], j);
 
 		//thread_sleep(thread_ptr);
 
@@ -146,18 +149,35 @@ void producer(void){
 		i++;
 	}
 
-	printf("exiting %llu\n", CYCLE);
+	printf("\t exiting %llu\n", CYCLE);
 
+	/*eventcount* ec_ptr = NULL;
+	printf("eventcounts\n");
+	LIST_FOR_EACH_L(ecdestroylist, i, 0)
+	{
+		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
+
+		printf("ec name %s count %llu\n", ec_ptr->name, ec_ptr->count);
+	}*/
+
+
+#ifdef NUM_THREADS
 	thread_context_terminate();
+#else
+	context_terminate();
+#endif
 
 	return;
 }
 
 void consumer(void){
 
-	desim_mutex_lock();
+#ifdef NUM_THREADS
+	thread *thread_ptr = thread_get_ptr(pthread_self());
+	int my_pid = thread_ptr->context->id;
+#else
 	int my_pid = c_pid++;
-	desim_mutex_unlock();
+#endif
 
 	count_t i = 1;
 
@@ -166,13 +186,13 @@ void consumer(void){
 	while(1)
 	{
 		//await work
-		printf("\t await %s cycle %llu\n", ec_c[my_pid].name, CYCLE);
-		await(&ec_c[my_pid], i);
+		printf("\t await %s cycle %llu\n", ec_c[my_pid]->name, CYCLE);
+		await(ec_c[my_pid], i);
 		i++;
 		printf("consumer %d:\n\t advanced and doing work cycle %llu\n", my_pid, CYCLE);
 
 		//do work
-		usleep(MILISECOND);
+		usleep(TWOMILLISECOND);
 
 		//charge latency
 		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
@@ -180,8 +200,8 @@ void consumer(void){
 		printf("consumer %d:\n\t resuming from latency cycle %llu\n",my_pid, CYCLE);
 
 		/*advance producer ctx*/
-		printf("\t advancing %s cycle %llu\n", ec_p[my_pid].name, CYCLE);
-		advance(&ec_p[my_pid]);
+		printf("\t advancing %s cycle %llu\n", ec_p[my_pid]->name, CYCLE);
+		advance(ec_p[my_pid]);
 	}
 
 	fatal("consumer should never exit cycle %llu\n", CYCLE);

@@ -107,6 +107,8 @@ typedef struct eventcount_t eventcount;
 typedef struct list_t list;
 typedef struct thread_t thread;
 
+extern list *ecdestroylist;
+
 #define CYCLE etime->count
 
 /* Globals*/
@@ -127,7 +129,7 @@ extern eventcount *etime;
 //DESim user level functions
 void desim_init(void);
 eventcount *eventcount_create(char *name);
-void context_create(void (*func)(void), unsigned stacksize, char *name);
+void context_create(void (*func)(void), unsigned stacksize, char *name, int id);
 void simulate(void);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
@@ -174,6 +176,7 @@ void thread_sleep(thread *thread_ptr);
 #define FFLUSH fflush(stderr); fflush(stdout);
 
 void desim_pause(void);
+void desim_dump_queues(void);
 
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
