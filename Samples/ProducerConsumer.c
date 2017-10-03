@@ -7,7 +7,7 @@
 
 #define LOOP 100
 #define LATENCY 4
-#define NUMPAIRS 50
+#define NUMPAIRS 100
 #define SECOND 1000000
 #define HALFSECOND 500000
 #define QUARTERSECOND 250000
