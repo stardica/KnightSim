@@ -125,8 +125,6 @@ jmp_buf main_context;*/
 extern eventcount *etime;
 
 //DESim user level functions
-
-
 void desim_init(void);
 eventcount *eventcount_create(char *name);
 void context_create(void (*func)(void), unsigned stacksize, char *name);
@@ -134,6 +132,8 @@ void simulate(void);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
 void pause(count_t value);
+void desim_mutex_lock(void);
+void desim_mutex_unlock(void);
 
 //DESim private functions
 void eventcount_init(eventcount * ec, count_t count, char *ecname);

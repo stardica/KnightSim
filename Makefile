@@ -1,9 +1,9 @@
 #nuber of threads
-NUM_THREADS = 32
+NUM_THREADS = 1
 
 #compiler and linker
-CC_FLAGS_64 = -g3 -O3 -Wall
-CC_FLAGS_32 = -g3 -O3 -Wall -m32
+CC_FLAGS_64 = -g3 -O3 -Wall -Werror
+CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32
 CC = g++ -std=c++0x -DNUM_THREADS=$(NUM_THREADS) -DMEASURE
 LINKER_FLAGS_64 = -static -lDESim64 -lIntelPCM64 -lpthread
 LINKER_FLAGS_32 = -static -lDESim32 -lIntelPCM32 -lpthread

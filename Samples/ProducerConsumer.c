@@ -5,9 +5,9 @@
 #include <string.h>
 #include "cpucounters.h"
 
-#define LOOP 3
+#define LOOP 100
 #define LATENCY 4
-#define NUMPAIRS 2
+#define NUMPAIRS 50
 #define SECOND 1000000
 #define HALFSECOND 500000
 #define QUARTERSECOND 250000
@@ -26,7 +26,7 @@ void consumer(void);
 void producer_init(void);
 void consumer_init(void);
 
-long long p_id = 0;
+long long p_pid = 0;
 long long c_pid = 0;
 
 
@@ -111,7 +111,10 @@ void consumer_init(void){
 
 void producer(void){
 
-	int my_pid = p_id++;
+	desim_mutex_lock();
+	int my_pid = p_pid++;
+	desim_mutex_unlock();
+
 	count_t i = 0;
 	count_t j = 1;
 
@@ -119,15 +122,18 @@ void producer(void){
 
 	while(i < LOOP)
 	{
+		printf("------LOOP %llu------\n", i);
+
+
 		//do work
 		usleep(MILISECOND);
 
-		printf("\t advancing ec_c cycle %llu\n", CYCLE);
+		printf("\t advancing %s cycle %llu\n", ec_c[my_pid].name, CYCLE);
 		advance(&ec_c[my_pid]);
 
 		//fatal("producer after pause\n");
 
-		printf("\t await ec_p cycle %llu\n", CYCLE);
+		printf("\t await %s cycle %llu\n", ec_p[my_pid].name, CYCLE);
 		await(&ec_p[my_pid], j);
 
 		//thread_sleep(thread_ptr);
@@ -140,7 +146,7 @@ void producer(void){
 		i++;
 	}
 
-	printf("producer %d: exiting %llu\n", my_pid, CYCLE);
+	printf("exiting %llu\n", CYCLE);
 
 	thread_context_terminate();
 
@@ -149,7 +155,10 @@ void producer(void){
 
 void consumer(void){
 
+	desim_mutex_lock();
 	int my_pid = c_pid++;
+	desim_mutex_unlock();
+
 	count_t i = 1;
 
 	printf("consumer %d:\n\t init\n", my_pid);
@@ -157,7 +166,7 @@ void consumer(void){
 	while(1)
 	{
 		//await work
-		printf("\t await ec_c cycle %llu\n", CYCLE);
+		printf("\t await %s cycle %llu\n", ec_c[my_pid].name, CYCLE);
 		await(&ec_c[my_pid], i);
 		i++;
 		printf("consumer %d:\n\t advanced and doing work cycle %llu\n", my_pid, CYCLE);
@@ -168,10 +177,10 @@ void consumer(void){
 		//charge latency
 		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
 		pause(LATENCY);
-		printf("\t resuming from latency cycle %llu\n", CYCLE);
+		printf("consumer %d:\n\t resuming from latency cycle %llu\n",my_pid, CYCLE);
 
 		/*advance producer ctx*/
-		printf("\t advancing ec_p cycle %llu\n", CYCLE);
+		printf("\t advancing %s cycle %llu\n", ec_p[my_pid].name, CYCLE);
 		advance(&ec_p[my_pid]);
 	}
 
