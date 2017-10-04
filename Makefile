@@ -1,10 +1,10 @@
 #nuber of threads
-NUM_THREADS = 1
+NUM_THREADS = 32
 
 #compiler and linker
 CC_FLAGS_64 = -g3 -O3 -Wall -Werror
 CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32
-CC = g++ -std=c++0x #-DNUM_THREADS=$(NUM_THREADS) -DMEASURE
+CC = g++ -std=c++0x -DMEASURE -DNUM_THREADS=$(NUM_THREADS)
 LINKER_FLAGS_64 = -static -lDESim64 -lIntelPCM64 -lpthread
 LINKER_FLAGS_32 = -static -lDESim32 -lIntelPCM32 -lpthread
 INTELPCM_INC = /home/stardica/Dropbox/CDA7919DoctoralResearch/IntelPCM/

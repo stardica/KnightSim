@@ -5,9 +5,9 @@
 #include <string.h>
 #include "cpucounters.h"
 
-#define LOOP 4
+#define LOOP 10
 #define LATENCY 4
-#define NUMPAIRS 2
+#define NUMPAIRS 32
 #define SECOND 1000000
 #define HALFSECOND 500000
 #define QUARTERSECOND 250000
@@ -42,7 +42,11 @@ int main(void){
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
-	printf("Simulate %d interactions\n", LOOP);
+#ifdef NUM_THREADS
+	printf("PDESim: Simulating %d threads, %d pair(s), and %d interactions\n", NUM_THREADS, NUMPAIRS, LOOP);
+#else
+	printf("DESIM: Simulating %d pair(s) and %d interactions\n", NUMPAIRS, LOOP);
+#endif
 
 	#ifdef MEASURE
 		p_start = RDTSC();
