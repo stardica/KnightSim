@@ -332,11 +332,14 @@ void thread_advance(eventcount *ec){
 			//no context or context is not ready to run
 			if(context_ptr)
 			{
-				//warning("context_ptr->count %llu > ec->count %llu\n", context_ptr->count, ec->count);
+				warning("context name %s count %llu  ec->count %llu\n", context_ptr->name, context_ptr->count, ec->count);
 				assert(context_ptr->count > ec->count);
 			}
+
 			break;
 		}
+
+		context_ptr = NULL;
 	}
 	pthread_mutex_unlock(&ec->count_mutex);
 
@@ -369,7 +372,7 @@ void thread_etime_launch(void){
 	int i = 0;
 	int size = 0;
 
-	printf("***********ETIME LAUNCH***************\n");
+	printf("***********ETIME LAUNCH*************** %llu\n", CYCLE);
 
 	//remove the first context from the etime's ctxlist
 	context_ptr = (context*)desim_list_dequeue(etime->ctxlist);
@@ -514,15 +517,28 @@ void thread_context_start(void){
 	return;
 }
 
-void desim_mutex_lock(void){
+void desim_mutex_lock(pthread_mutex_t *mutex){
 
-	pthread_mutex_lock(&user_lock_mutex);
-
+	if(mutex)
+	{
+		pthread_mutex_lock(mutex);
+	}
+	else
+	{
+		pthread_mutex_lock(&user_lock_mutex);
+	}
 	return;
 }
-void desim_mutex_unlock(void){
+void desim_mutex_unlock(pthread_mutex_t *mutex){
 
-	pthread_mutex_unlock(&user_lock_mutex);
+	if(mutex)
+	{
+		pthread_mutex_unlock(mutex);
+	}
+	else
+	{
+		pthread_mutex_unlock(&user_lock_mutex);
+	}
 
 	return;
 }
@@ -825,7 +841,7 @@ context *context_select(void){
 
 	if(!current_context)
 	{
-		printf("***********ETIME LAUNCH***************\n");
+		printf("***********ETIME LAUNCH*************** %llu\n", CYCLE);
 
 		/*LIST_FOR_EACH_L(etime->ctxlist, i, 0)
 		{

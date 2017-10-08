@@ -11,9 +11,9 @@
 
 #define NUMSWITCHES 32
 
-#define NUMPACKETS 50
+#define NUMPACKETS 1
 #define NUMPORTS 6
-#define MAXQUEUEDEPTH 4
+#define MAXQUEUEDEPTH 16
 #define SWITCHLATENCY 2
 
 #define BUSWIDTH 8
@@ -117,7 +117,6 @@ struct packet_t{
 	int dest[2];
 	int direction;
 };
-
 
 typedef struct crossbar_t crossbar;
 typedef struct packet_t packet;

@@ -23,7 +23,7 @@ DESIM_LIB = ./
 all: samples64 #samples32
 
 samples64: DESim64
-		#$(CC) $(CC_FLAGS_64) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
+		$(CC) $(CC_FLAGS_64) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
 		#$(CC) $(CC_FLAGS_64) ./Samples/Arbiter.c -o ./Samples/Arbiter64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
 		$(CC) $(CC_FLAGS_64) ./Samples/Switch.c -o ./Samples/Switch64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
 		@echo "Built $@ successfully"

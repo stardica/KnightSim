@@ -134,8 +134,8 @@ void simulate(void);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
 void pause(count_t value);
-void desim_mutex_lock(void);
-void desim_mutex_unlock(void);
+void desim_mutex_lock(pthread_mutex_t *mutex);
+void desim_mutex_unlock(pthread_mutex_t *mutex);
 
 //DESim private functions
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
