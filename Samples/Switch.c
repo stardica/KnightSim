@@ -254,6 +254,10 @@ void switch_io_ctrl(void){
 
 			packets_received++;
 
+			/*printf("switch_io_ctrl sw %d port %d destroying packet id %llu cycle %llu\n", switch_pid, port_pid, net_packet->id, P_TIME);
+			getchar();*/
+
+
 			//destroy the packet
 			net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
 			network_packet_destroy(net_packet);
@@ -835,9 +839,7 @@ void switch_producer_init(void){
 	int i = 0;
 	char buff[100];
 
-	warning("remember to turn on other producers\n");
-	for(i = 0; i < 1; i++)
-	//for(i = 0; i < NUMSWITCHES; i++)
+	for(i = 0; i < NUMSWITCHES; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "producer_%d", i);
