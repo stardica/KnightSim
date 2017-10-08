@@ -71,19 +71,19 @@ int main(void){
 	//l1 i caches
 	memset(buff,'\0' , 100);
 	snprintf(buff, 100, "producer_a");
-	context_create(producer_a, 32768, strdup(buff));
+	context_create(producer_a, 32768, strdup(buff), 0);
 
 	memset(buff,'\0' , 100);
 	snprintf(buff, 100, "producer_b");
-	context_create(producer_b, 32768, strdup(buff));
+	context_create(producer_b, 32768, strdup(buff), 1);
 
 	memset(buff,'\0' , 100);
 	snprintf(buff, 100, "arbiter");
-	context_create(arbiter, 32768, strdup(buff));
+	context_create(arbiter, 32768, strdup(buff), 0);
 
 	memset(buff,'\0' , 100);
 	snprintf(buff, 100, "consumer");
-	context_create(consumer, 32768, strdup(buff));
+	context_create(consumer, 32768, strdup(buff), 0);
 	printf("Contexts created\n");
 
 	/*starts simulation and won't return until simulation

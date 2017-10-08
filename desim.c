@@ -189,7 +189,7 @@ void *thread_control(void *thread_data){
 		//it may be time to end simulation check to see if all threads have quit...
 		if(desim_list_count(threadlist) == NUM_THREADS && desim_list_count(ctxlist) == 0)
 		{
-			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
+			printf("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
 					"Simulation has either ended or there is a problem with the simulation implementation.\n");
 			assert(desim_list_count(ctxlist) == 0);
 			pthread_cond_signal(&sim_end);
@@ -906,7 +906,7 @@ context *context_select(void){
 		{
 			/*if there isn't a ctx in etime's ctx list the simulation is
 					deadlocked this is a user simulation implementation problem*/
-			warning("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
+			printf("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
 					"Simulation has either ended or there is a problem with the simulation implementation.\n");
 			context_end(main_context);
 		}
