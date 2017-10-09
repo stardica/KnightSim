@@ -11,7 +11,7 @@
 
 #define NUMSWITCHES 32
 
-#define NUMPACKETS 1
+#define NUMPACKETS 25
 #define NUMPORTS 6
 #define MAXQUEUEDEPTH 16
 #define SWITCHLATENCY 2

@@ -457,7 +457,7 @@ void thread_launch(void){
 		etime->count = context_ptr->count;
 		thread_ptr->context = context_ptr;
 
-		//printf("assigning thread %d has context %s\n", thread_ptr->id, thread_ptr->context->name);
+		printf("assigning thread %d has context %s\n", thread_ptr->id, thread_ptr->context->name);
 
 		pthread_cond_signal(&thread_ptr->run);
 	}

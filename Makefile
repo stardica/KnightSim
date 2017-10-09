@@ -19,7 +19,6 @@ LIB_NAME_32 = "libDESim32.a"
 DESIM_INC = ./
 DESIM_LIB = ./
 
-
 all: samples64 #samples32
 
 samples64: DESim64

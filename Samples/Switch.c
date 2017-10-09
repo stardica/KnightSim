@@ -39,7 +39,6 @@ int main(void){
 		p_time = (RDTSC() - p_start);
 #endif
 
-
 	printf("End simulation, packets sent %d packets received %d runtime %llu\n",
 			packets_sent, packets_received, p_time);
 
