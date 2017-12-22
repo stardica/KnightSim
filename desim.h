@@ -48,14 +48,6 @@ extern "C" int decode32(int val);
 #error Unsupported machine/OS combination
 #endif
 
-
-
-/*typedef int thread_state;
-enum {halted, running};*/
-
-/*typedef int bool;
-enum {false, true};*/
-
 struct list_t{
 	char *name;
 	int count;  /* Number of elements in the list */
@@ -107,24 +99,13 @@ typedef struct eventcount_t eventcount;
 typedef struct list_t list;
 typedef struct thread_t thread;
 
+extern jmp_buf main_context;
+
 extern list *ecdestroylist;
 
-#define CYCLE etime->count
-
-/* Globals*/
-/*list *ctxdestroylist;
-list *ctxlist;
-list *ecdestroylist;
-list *threadlist;
-
-eventcount *etime;
-context *current_context;
-context *terminated_context;
-context *curctx;
-
-jmp_buf main_context;*/
-
 extern eventcount *etime;
+
+#define CYCLE etime->count
 
 //DESim user level functions
 void desim_init(void);
@@ -134,8 +115,6 @@ void simulate(void);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
 void pause(count_t value);
-void desim_mutex_lock(pthread_mutex_t *mutex);
-void desim_mutex_unlock(pthread_mutex_t *mutex);
 
 //DESim private functions
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
@@ -149,28 +128,6 @@ context *context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
 void desim_end(void);
-
-//PDESim private functions
-void thread_pool_create(void);
-thread *thread_create(void);
-void thread_init(thread *new_thread);
-void *thread_control(void *thread_data);
-int thread_set_affinity(int core_id);
-thread *thread_get_ptr(pthread_t thread_handle);
-void thread_launch(void);
-void thread_etime_launch(void);
-void thread_context_init(context *new_context);
-void thread_context_terminate(void);
-void thread_destroy(thread * thread_ptr);
-void thread_context_start(void);
-void thread_context_switch(jmp_buf buf);
-void thread_context_select(void);
-void thread_sync(thread *thread_ptr);
-void thread_hault(jmp_buf buf);
-void thread_await(eventcount *ec, count_t value);
-void thread_advance(eventcount *ec);
-void thread_pause(count_t value);
-void thread_sleep(thread *thread_ptr);
 
 //DESim/PDESim util stuff
 #define FFLUSH fflush(stderr); fflush(stdout);

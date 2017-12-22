@@ -9,10 +9,11 @@
 #include <time.h>
 #include <assert.h>
 
-#define NUMSWITCHES 32
+#define NUMSWITCHES 6
 
-#define NUMPACKETS 25
+#define NUMPACKETS 10
 #define NUMPORTS 6
+
 #define MAXQUEUEDEPTH 16
 #define SWITCHLATENCY 2
 

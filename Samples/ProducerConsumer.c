@@ -3,21 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <string.h>
-#include "cpucounters.h"
 
 #define LOOP 10
 #define LATENCY 4
 #define NUMPAIRS 4
-#define SECOND 1000000
-#define HALFSECOND 500000
-#define QUARTERSECOND 250000
-#define TWOMILLISECOND 2000
-#define ONEMILLISECOND 1000
-#define HALFMILISECOND 500
-#define QUARTERMILISECOND 250
-
-unsigned long long p_start = 0;
-unsigned long long p_time = 0;
 
 eventcount **ec_p;
 eventcount **ec_c;
@@ -42,26 +31,12 @@ int main(void){
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
-#ifdef NUM_THREADS
-	printf("PDESim: Simulating %d threads, %d pair(s), and %d interactions\n", NUM_THREADS, NUMPAIRS, LOOP);
-#else
-	printf("DESIM: Simulating %d pair(s) and %d interactions\n", NUMPAIRS, LOOP);
-#endif
 
-	#ifdef MEASURE
-		p_start = RDTSC();
-	#endif
+	printf("DESIM: Simulating %d pair(s) and %d interactions\n", NUMPAIRS, LOOP);
 
 	simulate();
 
-	#ifdef MEASURE
-		p_time = (RDTSC() - p_start);
-	#endif
-
-	//Temporarily here for measurement purposes
-	desim_end();
-
-	printf("End simulation time in cycles %llu\n", p_time);
+	printf("End simulation time in cycles %llu\n", CYCLE);
 
 	return 1;
 }
@@ -116,13 +91,7 @@ void consumer_init(void){
 
 void producer(void){
 
-#ifdef NUM_THREADS
-	thread *thread_ptr = thread_get_ptr(pthread_self());
-	int my_pid = thread_ptr->context->id;
-#else
 	int my_pid = p_pid++;
-#endif
-
 
 	count_t i = 0;
 	count_t j = 1;
@@ -132,18 +101,13 @@ void producer(void){
 	while(i < LOOP)
 	{
 		//do work
-		usleep(TWOMILLISECOND);
 
 		printf("\t advancing %s cycle %llu\n", ec_c[my_pid]->name, CYCLE);
 		advance(ec_c[my_pid]);
-		//printf("before ec name %s count %llu\n", ec_c[my_pid]->name, ec_c[my_pid]->count);
 
-		//printf("after ec name %s count %llu\n", ec_c[my_pid]->name, ec_c[my_pid]->count);
 
 		printf("\t await %s cycle %llu\n", ec_p[my_pid]->name, CYCLE);
 		await(ec_p[my_pid], j);
-
-		//thread_sleep(thread_ptr);
 
 		j++;
 		printf("producer %d:\n", my_pid);
@@ -155,33 +119,14 @@ void producer(void){
 
 	printf("\t exiting %llu\n", CYCLE);
 
-	/*eventcount* ec_ptr = NULL;
-	printf("eventcounts\n");
-	LIST_FOR_EACH_L(ecdestroylist, i, 0)
-	{
-		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
-
-		printf("ec name %s count %llu\n", ec_ptr->name, ec_ptr->count);
-	}*/
-
-
-#ifdef NUM_THREADS
-	thread_context_terminate();
-#else
 	context_terminate();
-#endif
 
 	return;
 }
 
 void consumer(void){
 
-#ifdef NUM_THREADS
-	thread *thread_ptr = thread_get_ptr(pthread_self());
-	int my_pid = thread_ptr->context->id;
-#else
 	int my_pid = c_pid++;
-#endif
 
 	count_t i = 1;
 
@@ -190,13 +135,15 @@ void consumer(void){
 	while(1)
 	{
 		//await work
-		printf("\t await %s cycle %llu\n", ec_c[my_pid]->name, CYCLE);
+		printf("\tetime count\n");
+		printf("\t await %s\n", ec_c[my_pid]->name);
+		printf("\t cycle %llu\n", etime->count);
+
 		await(ec_c[my_pid], i);
 		i++;
 		printf("consumer %d:\n\t advanced and doing work cycle %llu\n", my_pid, CYCLE);
 
 		//do work
-		usleep(TWOMILLISECOND);
 
 		//charge latency
 		printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);

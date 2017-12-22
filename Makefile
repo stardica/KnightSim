@@ -1,14 +1,9 @@
-#nuber of threads
-NUM_THREADS = 1
-
 #compiler and linker
 CC_FLAGS_64 = -g3 -O3 -Wall -Werror
 CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32
-CC = g++ -std=c++0x -DMEASURE #-DNUM_THREADS=$(NUM_THREADS)
-LINKER_FLAGS_64 = -static -lDESim64 -lIntelPCM64 -lpthread
-LINKER_FLAGS_32 = -static -lDESim32 -lIntelPCM32 -lpthread
-INTELPCM_INC = /home/stardica/Dropbox/CDA7919DoctoralResearch/IntelPCM/
-INTELPCM_LIB = /home/stardica/Dropbox/CDA7919DoctoralResearch/IntelPCM/
+CC = g++ -std=c++0x
+LINKER_FLAGS_64 = -static -lDESim64 -lpthread
+LINKER_FLAGS_32 = -m32 -static -lDESim32 -lpthread
 
 #DEsim
 LIB_NAME_64 = "libDESim64.a"
@@ -19,18 +14,18 @@ LIB_NAME_32 = "libDESim32.a"
 DESIM_INC = ./
 DESIM_LIB = ./
 
-all: samples64 #samples32
+all: samples64 samples32
 
 samples64: DESim64
-		$(CC) $(CC_FLAGS_64) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
-		#$(CC) $(CC_FLAGS_64) ./Samples/Arbiter.c -o ./Samples/Arbiter64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
-		$(CC) $(CC_FLAGS_64) ./Samples/Switch.c -o ./Samples/Switch64 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
+		$(CC) $(CC_FLAGS_64) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer64 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
+		$(CC) $(CC_FLAGS_64) ./Samples/Arbiter.c -o ./Samples/Arbiter64 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
+		$(CC) $(CC_FLAGS_64) ./Samples/Switch.c -o ./Samples/Switch64 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_64)
 		@echo "Built $@ successfully"
 				
 samples32: DESim32
-		#$(CC) $(CC_FLAGS_32) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer32 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
-		#$(CC) $(CC_FLAGS_32) ./Samples/Arbiter.c -o ./Samples/Arbiter32 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
-		#$(CC) $(CC_FLAGS_32) ./Samples/Switch.c -o ./Samples/Switch32 -I$(DESIM_INC) -I$(INTELPCM_INC) -L$(INTELPCM_LIB) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
+		$(CC) $(CC_FLAGS_32) ./Samples/ProducerConsumer.c -o ./Samples/ProducerConsumer32 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
+		$(CC) $(CC_FLAGS_32) ./Samples/Arbiter.c -o ./Samples/Arbiter32 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
+		$(CC) $(CC_FLAGS_32) ./Samples/Switch.c -o ./Samples/Switch32 -I$(DESIM_INC) -L$(DESIM_LIB) $(LINKER_FLAGS_32)
 		@echo "Built $@ successfully"
 		
 

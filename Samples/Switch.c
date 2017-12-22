@@ -1,5 +1,4 @@
 #include "Switch.h"
-#include "cpucounters.h"
 
 int producer_pid = 0;
 int switch_pid = 0;
@@ -9,9 +8,6 @@ long long packet_id = 0;
 
 int packets_sent = 0;
 int packets_received = 0;
-
-unsigned long long p_start = 0;
-unsigned long long p_time = 0;
 
 struct switch_t **__switch;
 eventcount **switch_ec;
@@ -29,18 +25,10 @@ int main(void){
 	is complete or all contexts complete*/
 	printf("Start switch simulation %d network packets\n", NUMPACKETS * NUMSWITCHES);
 
-#ifdef MEASURE
-		p_start = RDTSC();
-#endif
-
 	simulate();
 
-#ifdef MEASURE
-		p_time = (RDTSC() - p_start);
-#endif
-
-	printf("End simulation, packets sent %d packets received %d runtime %llu\n",
-			packets_sent, packets_received, p_time);
+	printf("End simulation, packets sent %d packets received %d cycles %llu\n",
+			packets_sent, packets_received, P_TIME);
 
 	return 1;
 }
@@ -53,22 +41,10 @@ packet *switch_io_ctrl_get_packet(struct switch_t *switches, enum port_name port
 	switch(current_io_lane)
 	{
 		case io_request:
-#ifdef NUM_THREADS
-			desim_mutex_lock(&switches->mutex);
 			net_packet = (packet *)desim_list_get(switches->tx_request_queues[port], 0);
-			desim_mutex_unlock(&switches->mutex);
-#else
-			net_packet = (packet *)desim_list_get(switches->tx_request_queues[port], 0);
-#endif
 			break;
 		case io_reply:
-#ifdef NUM_THREADS
-			desim_mutex_lock(&switches->mutex);
 			net_packet = (packet *)desim_list_get(switches->tx_reply_queues[port], 0);
-			desim_mutex_unlock(&switches->mutex);
-#else
-			net_packet = (packet *)desim_list_get(switches->tx_reply_queues[port], 0);
-#endif
 			break;
 		case io_invalid_lane:
 		default:
@@ -131,7 +107,6 @@ list *switch_io_get_next_rx_queue(struct switch_t *switches, enum port_name port
 
 	next_queue = get_next_queue_reverse(port);
 
-
 	switch(next_queue)
 	{
 		case west_queue:
@@ -183,21 +158,6 @@ void switch_io_ctrl(void){
 
 	int total_ports = NUMPORTS * NUMSWITCHES;
 
-#ifdef NUM_THREADS
-
-	thread *thread_ptr = thread_get_ptr(pthread_self());
-	int switch_pid = thread_ptr->context->id % NUMSWITCHES;
-
-	desim_mutex_lock(NULL);
-	int port_pid = switch_io_port_pid;
-
-	if(!((total_ports - 1 - switch_io_pid) % NUMSWITCHES))
-		switch_io_port_pid++;
-
-	switch_io_pid++;
-	desim_mutex_unlock(NULL);
-
-#else
 	int switch_pid = switch_io_pid % NUMSWITCHES; //should give 0 - 31
 	int port_pid = switch_io_port_pid;
 
@@ -205,8 +165,6 @@ void switch_io_ctrl(void){
 		switch_io_port_pid++;
 
 	switch_io_pid++;
-
-#endif
 
 	//printf("s pid %d p pid %d\n", switch_pid, port_pid);
 
@@ -261,15 +219,8 @@ void switch_io_ctrl(void){
 
 				P_PAUSE(transfer_time);
 
-#ifdef NUM_THREADS
-				desim_mutex_lock(&__switch[switch_pid]->mutex);
 				net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
 				desim_list_enqueue(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-				desim_mutex_unlock(&__switch[switch_pid]->mutex);
-#else
-				net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-				desim_list_enqueue(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-#endif
 
 				if(port_pid == east_queue)
 					advance(switch_ec[__switch[switch_pid]->next_west]);
@@ -280,24 +231,11 @@ void switch_io_ctrl(void){
 		else
 		{
 			step++;
-
 			P_PAUSE(transfer_time);
-
 			packets_received++;
 
-			/*printf("switch_io_ctrl sw %d port %d destroying packet id %llu cycle %llu\n", switch_pid, port_pid, net_packet->id, P_TIME);
-			getchar();*/
-
-
 			//destroy the packet
-#ifdef NUM_THREADS
-			desim_mutex_lock(&__switch[switch_pid]->mutex);
 			net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-			desim_mutex_unlock(&__switch[switch_pid]->mutex);
-#else
-			net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-#endif
-
 
 			network_packet_destroy(net_packet);
 		}
@@ -312,12 +250,7 @@ void switch_io_ctrl(void){
 
 void switch_ctrl(void){
 
-#ifdef NUM_THREADS
-	thread *thread_ptr = thread_get_ptr(pthread_self());
-	int my_pid = thread_ptr->context->id;
-#else
 	int my_pid = switch_pid++;
-#endif
 
 	count_t step = 1;
 
@@ -335,13 +268,13 @@ void switch_ctrl(void){
 
 		/*wait and enter the subclock domain
 		to see if anyone else advance the switch this cycle*/
-		//ENTER_SUB_CLOCK
+		ENTER_SUB_CLOCK
 
 		/*models a cross bar link as many inputs to outputs
 		as possible in a given cycle*/
 		switch_crossbar_link(__switch[my_pid]);
 
-		//EXIT_SUB_CLOCK
+		EXIT_SUB_CLOCK
 
 		//charge latency
 		P_PAUSE(__switch[my_pid]->latency);
@@ -355,13 +288,7 @@ void switch_ctrl(void){
 				move the packet from the input queue to the correct output queue*/
 
 				//careful here, the next line is for the INPUT queue...
-#ifdef NUM_THREADS
-				desim_mutex_lock(&__switch[my_pid]->mutex);
 				net_packet = (packet *)desim_list_remove_at(switch_get_rx_queue(__switch[my_pid], crossbar_get_port_link_status(__switch[my_pid])), 0);
-				desim_mutex_unlock(&__switch[my_pid]->mutex);
-#else
-				net_packet = (packet *)desim_list_remove_at(switch_get_rx_queue(__switch[my_pid], crossbar_get_port_link_status(__switch[my_pid])), 0);
-#endif
 				assert(net_packet);
 
 				/*enum port_name{
@@ -383,13 +310,7 @@ void switch_ctrl(void){
 				//get a pointer to the output queue
 				out_queue = switch_get_tx_queue(__switch[my_pid], __switch[my_pid]->crossbar->current_port);
 
-#ifdef NUM_THREADS
-				desim_mutex_lock(&__switch[my_pid]->mutex);
 				desim_list_enqueue(out_queue, net_packet);
-				desim_mutex_unlock(&__switch[my_pid]->mutex);
-#else
-				desim_list_enqueue(out_queue, net_packet);
-#endif
 
 				advance(__switch[my_pid]->switch_io_ec[__switch[my_pid]->crossbar->current_port]);
 				net_packet = NULL;
@@ -398,9 +319,6 @@ void switch_ctrl(void){
 
 			__switch[my_pid]->crossbar->current_port = get_next_queue_rb(__switch[my_pid]->crossbar->current_port);
 		}
-
-		//getchar();
-
 
 		step += __switch[my_pid]->crossbar->num_links;
 
@@ -769,22 +687,10 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 	switch(__switch->next_crossbar_lane)
 	{
 		case crossbar_request:
-#ifdef NUM_THREADS
-			desim_mutex_lock(&__switch->mutex);
 			net_packet = (packet *)desim_list_get(__switch->rx_request_queues[__switch->current_queue], 0);
-			desim_mutex_unlock(&__switch->mutex);
-#else
-			net_packet = (packet *)desim_list_get(__switch->rx_request_queues[__switch->current_queue], 0);
-#endif
 			break;
 		case crossbar_reply:
-#ifdef NUM_THREADS
-			desim_mutex_lock(&__switch->mutex);
 			net_packet = (packet *)desim_list_get(__switch->rx_reply_queues[__switch->current_queue], 0);
-			desim_mutex_unlock(&__switch->mutex);
-#else
-			net_packet = (packet *)desim_list_get(__switch->rx_reply_queues[__switch->current_queue], 0);
-#endif
 			break;
 		case crossbar_invalid_lane:
 		default:
@@ -797,12 +703,7 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 
 void switch_producer_ctrl(void){
 
-#ifdef NUM_THREADS
-	thread *thread_ptr = thread_get_ptr(pthread_self());
-	int my_pid = thread_ptr->context->id;
-#else
 	int my_pid = producer_pid++;
-#endif
 
 	int i = 0;
 	int type = 0;
@@ -830,14 +731,7 @@ void switch_producer_ctrl(void){
 			}
 
 			//success clear the packet pointer
-#ifdef NUM_THREADS
-			desim_mutex_lock(&__switch[my_pid]->mutex);
 			desim_list_enqueue(__switch[my_pid]->rx_request_queues[north_queue], packet_ptr);
-			desim_mutex_unlock(&__switch[my_pid]->mutex);
-#else
-			desim_list_enqueue(__switch[my_pid]->rx_request_queues[north_queue], packet_ptr);
-#endif
-
 		}
 		else if(packet_ptr->type == reply)
 		{
@@ -849,13 +743,7 @@ void switch_producer_ctrl(void){
 			}
 
 			//success clear the packet pointer
-#ifdef NUM_THREADS
-			desim_mutex_lock(&__switch[my_pid]->mutex);
 			desim_list_enqueue(__switch[my_pid]->rx_reply_queues[north_queue], packet_ptr);
-			desim_mutex_unlock(&__switch[my_pid]->mutex);
-#else
-			desim_list_enqueue(__switch[my_pid]->rx_reply_queues[north_queue], packet_ptr);
-#endif
 		}
 
 		packets_sent++;
@@ -872,11 +760,7 @@ void switch_producer_ctrl(void){
 	//This context finished its work, destroy
 	printf("producer terminating cycle %llu\n", P_TIME);
 	//getchar();
-#ifdef NUM_THREADS
-	thread_context_terminate();
-#else
 	context_terminate();
-#endif
 
 	return;
 }
@@ -920,8 +804,8 @@ void switch_producer_init(void){
 	int i = 0;
 	char buff[100];
 
-	for(i = 0; i < 1; i++)
-	//for(i = 0; i < NUMSWITCHES; i++)
+	//for(i = 0; i < 1; i++)
+	for(i = 0; i < NUMSWITCHES; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "producer_%d", i);
