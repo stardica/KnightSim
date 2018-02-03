@@ -30,7 +30,7 @@ unsigned long long sim_time = 0;
 int main(void){
 
 	//user must initialize DESim
-	desim_init();
+	KnightSim_init();
 
 	producer_init();
 
@@ -48,7 +48,7 @@ int main(void){
 	sim_time += (rdtsc() - sim_start);
 
 	//clean up
-	desim_clean_up();
+	KnightSim_clean_up();
 
 	printf("End simulation time %llu\n", sim_time);
 

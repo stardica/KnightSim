@@ -1,5 +1,5 @@
-#ifndef __DESim_H__
-#define __DESim_H__
+#ifndef __KnightSim_H__
+#define __KnightSim_H__
 
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 32768
@@ -25,7 +25,7 @@ typedef Time_t count_t;
 typedef __jmp_buf jmp_buf;
 
 /*our assembly fucntion (.s) files these store
-and load CPU register values. For DESim
+and load CPU register values. For KnightSim
 the stack pointer and instruction pointer are
 all we really care about.*/
 #if defined(__linux__) && defined(__x86_64)
@@ -100,8 +100,8 @@ extern eventcount *etime;
 
 #define CYCLE etime->count
 
-//DESim user level functions
-void desim_init(void);
+//KnightSim user level functions
+void KnightSim_init(void);
 eventcount *eventcount_create(char *name);
 void context_create(void (*func)(void), unsigned stacksize, char *name, int id);
 void simulate(void);
@@ -109,7 +109,7 @@ void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
 void pause(count_t value);
 
-//DESim private functions
+//KnightSim private functions
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
@@ -120,37 +120,37 @@ void context_end(jmp_buf buf);
 context *context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
-void desim_clean_up(void);
+void KnightSim_clean_up(void);
 
-//DESim/PDESim util stuff
+//KnightSim/PKnightSim util stuff
 #define FFLUSH fflush(stderr); fflush(stdout);
 
-void desim_pause(void);
-void desim_dump_queues(void);
+void KnightSim_pause(void);
+void KnightSim_dump_queues(void);
 
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 #define LIST_FOR_EACH_L(list_ptr, iter, iter_start_value) \
-	for ((iter) = iter_start_value; (iter) < desim_list_count((list_ptr)); (iter)++)
+	for ((iter) = iter_start_value; (iter) < KnightSim_list_count((list_ptr)); (iter)++)
 
 #define LIST_FOR_EACH_LG(list_ptr, iter, iter_start_value) \
-	for ((iter) = iter_start_value; (iter) <= desim_list_count((list_ptr)); (iter)++)
+	for ((iter) = iter_start_value; (iter) <= KnightSim_list_count((list_ptr)); (iter)++)
 
 #define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
 
-list *desim_list_create(unsigned int size);
-void desim_list_insert(list *list_ptr, int index, void *elem);
-void *desim_list_get(list *list_ptr, int index);
-int desim_list_count(list *list_ptr);
-void desim_list_enqueue(list *list_ptr, void *elem);
-void *desim_list_dequeue(list *list_ptr);
-void desim_list_add(list *list_ptr, void *elem);
-void desim_list_grow(list *list_ptr);
-void *desim_list_remove_at(list *list_ptr, int index);
-void *desim_list_remove(list *list_ptr, void *elem);
-int desim_list_index_of(list *list_ptr, void *elem);
-void desim_list_clear(list *list_ptr);
-void desim_list_free(list *list_ptr);
+list *KnightSim_list_create(unsigned int size);
+void KnightSim_list_insert(list *list_ptr, int index, void *elem);
+void *KnightSim_list_get(list *list_ptr, int index);
+int KnightSim_list_count(list *list_ptr);
+void KnightSim_list_enqueue(list *list_ptr, void *elem);
+void *KnightSim_list_dequeue(list *list_ptr);
+void KnightSim_list_add(list *list_ptr, void *elem);
+void KnightSim_list_grow(list *list_ptr);
+void *KnightSim_list_remove_at(list *list_ptr, int index);
+void *KnightSim_list_remove(list *list_ptr, void *elem);
+int KnightSim_list_index_of(list *list_ptr, void *elem);
+void KnightSim_list_clear(list *list_ptr);
+void KnightSim_list_free(list *list_ptr);
 
-#endif /*__DESim_H__*/
+#endif /*__KnightSim_H__*/

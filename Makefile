@@ -7,13 +7,13 @@ CC = g++
 LINKER_FLAGS_64 = -lKnightSim64
 
 all: 
-	 $(MAKE) -C $(KNIGHTSIM_DIR) all
-	 $(CC) $(CC_FLAGS_64) ProducerConsumer.c -o ProducerConsumer64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
-	 @echo "Built $@ successfully"
-	 #$(CC) $(CC_FLAGS_64) Arbiter.c -o Arbiter64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
-	 #@echo "Built $@ successfully"
-	 #$(CC) $(CC_FLAGS_64) Switch.c -o Switch64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
-	 #@echo "Built $@ successfully"
+	$(MAKE) -C $(KNIGHTSIM_DIR) all
+	$(CC) $(CC_FLAGS_64) ProducerConsumer.c -o ProducerConsumer64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
+	@echo "Built $@ successfully"
+	#$(CC) $(CC_FLAGS_64) Arbiter.c -o Arbiter64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
+	#@echo "Built $@ successfully"
+	#$(CC) $(CC_FLAGS_64) Switch.c -o Switch64 -I$(KNIGHTSIM_DIR) -I$(INCLUDE_DIR) -L$(LIB_DIR) $(LINKER_FLAGS_64)
+	#@echo "Built $@ successfully"
 
 clean:
 	$(MAKE) -C $(KNIGHTSIM_DIR) clean

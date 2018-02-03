@@ -7,7 +7,7 @@ CC = g++
 LIB_NAME_64 = "libKnightSim64.a"
 LIB_NAME_32 = "libKnightSim32.a"
 
-all: knightsim64 knightsim32
+all: makedir knightsim64 knightsim32
 
 knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o
 		ar -r ../lib/$(LIB_NAME_64) knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o
@@ -16,6 +16,10 @@ knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o
 knightsim32: knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o
 		ar -r ../lib/$(LIB_NAME_32) knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o
 		@echo "Built $@ successfully"
+
+makedir:
+	mkdir -p ../lib
+
 
 
 #64 bit versions
@@ -52,9 +56,8 @@ encode32.o: encode32.s
 	$(CC) $(CC_FLAGS_32) encode32.s -c
 	
 clean:
-	rm -f \
+	rm -rf \
 	*.o \
-	../lib/$(LIB_NAME_64) \
-	../lib/$(LIB_NAME_32)
+	../lib/
 	
 	

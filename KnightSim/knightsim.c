@@ -28,14 +28,14 @@ long long ecid = 0;
 long long ctxid = 0;
 long long threadid = 0;
 
-void desim_init(void){
+void KnightSim_init(void){
 
 	char buff[100];
 
 	//other globals
-	ctxdestroylist = desim_list_create(4);
-	//ctxlist = desim_list_create(4);
-	ecdestroylist = desim_list_create(4);
+	ctxdestroylist = KnightSim_list_create(4);
+	//ctxlist = KnightSim_list_create(4);
+	ecdestroylist = KnightSim_list_create(4);
 
 	//set up etime
 	memset(buff,'\0' , 100);
@@ -46,24 +46,24 @@ void desim_init(void){
 }
 
 
-void desim_dump_queues(void){
+void KnightSim_dump_queues(void){
 
 	int i = 0;
 	int j = 0;
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
 
-	printf("desim_dump_queues():\n");
+	printf("KnightSim_dump_queues():\n");
 
 	printf("eventcounts\n");
 	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
-		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
+		ec_ptr = (eventcount*)KnightSim_list_get(ecdestroylist, i);
 
 		printf("ec name %s count %llu\n", ec_ptr->name, ec_ptr->count);
 		LIST_FOR_EACH_L(ec_ptr->ctxlist, j, 0)
 		{
-			ctx_ptr = (context *)desim_list_get(ec_ptr->ctxlist, j);
+			ctx_ptr = (context *)KnightSim_list_get(ec_ptr->ctxlist, j);
 			printf("\tslot %d ctx %s ec count %llu ctx count %llu\n",
 					j, ctx_ptr->name, ec_ptr->count, ctx_ptr->count);
 		}
@@ -87,7 +87,7 @@ eventcount *eventcount_create(char *name){
 	eventcount_init(ec_ptr, 0, name);
 
 	//for destroying the ec later
-	desim_list_insert(ecdestroylist, 0, ec_ptr);
+	KnightSim_list_insert(ecdestroylist, 0, ec_ptr);
 
 	return ec_ptr;
 }
@@ -115,13 +115,13 @@ void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
 	context_init(new_context_ptr);
 
 	//put the new ctx in the global ctx list
-	//desim_list_insert(ctxlist, 0, new_context_ptr);
+	//KnightSim_list_insert(ctxlist, 0, new_context_ptr);
 
 	//put in etime's ctx list
-	desim_list_insert(etime->ctxlist, 0, new_context_ptr);
+	KnightSim_list_insert(etime->ctxlist, 0, new_context_ptr);
 
 	//for destroying the context later
-	desim_list_insert(ctxdestroylist, 0, new_context_ptr);
+	KnightSim_list_insert(ctxdestroylist, 0, new_context_ptr);
 
 	return;
 }
@@ -131,7 +131,7 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->name = ecname;
 	ec->id = ecid++;
 	ec->count = count;
-	ec->ctxlist = desim_list_create(4);
+	ec->ctxlist = KnightSim_list_create(4);
 	//pthread_mutex_init(&ec->count_mutex, NULL); //only used for parallel implementations
     return;
 }
@@ -152,15 +152,15 @@ void advance(eventcount *ec){
 	 * and set all ctx time to current time (etime.cout)*/
 	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
 	{
-		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
 
 		if(context_ptr && (context_ptr->count == ec->count))
 		{
-			context_ptr = (context *)desim_list_dequeue(ec->ctxlist);
+			context_ptr = (context *)KnightSim_list_dequeue(ec->ctxlist);
 
 			//insert at head of etime ctx list this should run this cycle
 			context_ptr->count = etime->count;
-			desim_list_insert(etime->ctxlist, 0, context_ptr);
+			KnightSim_list_insert(etime->ctxlist, 0, context_ptr);
 		}
 		else
 		{
@@ -191,7 +191,7 @@ void advance_old(eventcount *ec){
 	 * and set all ctx time to current time (etime.cout)*/
 	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
 	{
-		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
 
 		if(context_ptr && (context_ptr->count == ec->count))
 		{
@@ -199,8 +199,8 @@ void advance_old(eventcount *ec){
 			//fflush(stdout);
 			//assert(context_ptr->count == ec->count);
 			//context_ptr->count = etime->count;
-			context_ptr = (context *)desim_list_dequeue(ec->ctxlist);
-			desim_list_enqueue(ctxlist, context_ptr);
+			context_ptr = (context *)KnightSim_list_dequeue(ec->ctxlist);
+			KnightSim_list_enqueue(ctxlist, context_ptr);
 		}
 		else
 		{
@@ -222,8 +222,8 @@ void context_terminate(void){
 	//context *ctx_ptr = NULL;
 
 	/*remove from global ctx and destroy lists*/
-	//ctx_ptr = (context*)desim_list_remove_at(ctxlist, 0);
-	/*ctx_ptr = (context*)desim_list_remove(ctxdestroylist, ctx_ptr);*/
+	//ctx_ptr = (context*)KnightSim_list_remove_at(ctxlist, 0);
+	/*ctx_ptr = (context*)KnightSim_list_remove(ctxdestroylist, ctx_ptr);*/
 	//assert(last_context == ctx_ptr);
 	//assert(ctx_ptr != NULL);
 
@@ -259,8 +259,8 @@ void eventcount_destroy(eventcount *ec_ptr){
 	//printf("EC destroying name %s count %llu\n", ec_ptr->name, ec_ptr->count);
 
 	free(ec_ptr->name);
-	desim_list_clear(ec_ptr->ctxlist);
-	desim_list_free(ec_ptr->ctxlist);
+	KnightSim_list_clear(ec_ptr->ctxlist);
+	KnightSim_list_free(ec_ptr->ctxlist);
 	free(ec_ptr);
 	ec_ptr = NULL;
 
@@ -272,7 +272,7 @@ void eventcount_destroy(eventcount *ec_ptr){
 context *context_select(void){
 
 	/*get next ctx to run*/
-	current_context = (context*)desim_list_dequeue(etime->ctxlist);
+	current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
 
 	if(current_context)
 	{
@@ -282,7 +282,7 @@ context *context_select(void){
 	{
 		/*if there isn't a ctx in etime's ctx list the simulation is
 				deadlocked this is a user simulation implementation problem*/
-		printf("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
+		printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
 				"Simulation has either ended or there is a problem with the simulation implementation.\n");
 		context_end(main_context);
 	}
@@ -299,7 +299,7 @@ context *context_select_old(void){
 	context * next_context_ptr = NULL;
 
 	/*get next ctx to run*/
-	current_context = (context*)desim_list_get(ctxlist, 0);
+	current_context = (context*)KnightSim_list_get(ctxlist, 0);
 
 	if(!current_context)
 	{
@@ -307,7 +307,7 @@ context *context_select_old(void){
 
 		/*if there isn't a ctx on the global context list
 		we are ready to advance in cycles, pull from etime*/
-		current_context = (context*)desim_list_dequeue(etime->ctxlist);
+		current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
 
 		//put all ready ctx from etime to ctxlist
 		if(current_context)
@@ -315,20 +315,20 @@ context *context_select_old(void){
 			etime->count = current_context->count;
 
 			/*put at head of ec's ctx list*/
-			desim_list_insert(ctxlist, 0, current_context);
+			KnightSim_list_insert(ctxlist, 0, current_context);
 
 			//Pull any other contexts that have the same count as the first
-			int size = desim_list_count(etime->ctxlist);
+			int size = KnightSim_list_count(etime->ctxlist);
 
 			for(int i = 0; i < size; i++)
 			{
-				next_context_ptr = (context*)desim_list_get(etime->ctxlist, 0);
+				next_context_ptr = (context*)KnightSim_list_get(etime->ctxlist, 0);
 
 				if(next_context_ptr && (etime->count == next_context_ptr->count))
 				{
-					current_context = (context*)desim_list_remove(etime->ctxlist, next_context_ptr);
+					current_context = (context*)KnightSim_list_remove(etime->ctxlist, next_context_ptr);
 					/*put at head of ec's ctx list*/
-					desim_list_insert(ctxlist, 0, current_context);
+					KnightSim_list_insert(ctxlist, 0, current_context);
 				}
 				else
 				{
@@ -340,7 +340,7 @@ context *context_select_old(void){
 		{
 			/*if there isn't a ctx in etime's ctx list the simulation is
 					deadlocked this is a user simulation implementation problem*/
-			printf("DESim: deadlock detected now exiting... all contexts are in an await state.\n"
+			printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
 					"Simulation has either ended or there is a problem with the simulation implementation.\n");
 			context_end(main_context);
 		}
@@ -360,7 +360,7 @@ void pause(count_t value){
 	//etime has a new size
 	LIST_FOR_EACH_LG(etime->ctxlist, i, 0)
 	{
-		context_ptr = (context *)desim_list_get(etime->ctxlist, i);
+		context_ptr = (context *)KnightSim_list_get(etime->ctxlist, i);
 
 		if(!context_ptr || (context_ptr && value < context_ptr->count))
 		{
@@ -369,7 +369,7 @@ void pause(count_t value){
 
 			//set the curctx's value
 			current_context->count = etime->count + value;
-			desim_list_insert(etime->ctxlist, i, current_context);
+			KnightSim_list_insert(etime->ctxlist, i, current_context);
 			break;
 		}
 
@@ -405,17 +405,17 @@ void await(eventcount *ec, count_t value){
 
 	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
 	{
-		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
 
 		if(!context_ptr || (context_ptr && value < context_ptr->count))
 		{
 			/*we are at the head or tail of the list
 			insert ctx at this position*/
-			//context_ptr = (context *)desim_list_dequeue(etime->ctxlist);
+			//context_ptr = (context *)KnightSim_list_dequeue(etime->ctxlist);
 
 			//set the curctx's value
 			current_context->count = value;
-			desim_list_insert(ec->ctxlist, i, current_context);
+			KnightSim_list_insert(ec->ctxlist, i, current_context);
 			break;
 		}
 
@@ -457,16 +457,16 @@ void await_old(eventcount *ec, count_t value){
 
 	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
 	{
-		context_ptr = (context *)desim_list_get(ec->ctxlist, i);
+		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
 		if(!context_ptr || (context_ptr && value < context_ptr->count))
 		{
 			/*we are at the head or tail of the list
 			insert ctx at this position*/
-			context_ptr = (context *)desim_list_dequeue(ctxlist);
+			context_ptr = (context *)KnightSim_list_dequeue(ctxlist);
 
 			//set the curctx's value
 			context_ptr->count = value;
-			desim_list_insert(ec->ctxlist, i, context_ptr);
+			KnightSim_list_insert(ec->ctxlist, i, context_ptr);
 			break;
 		}
 
@@ -492,17 +492,17 @@ void simulate(void){
 }
 
 
-void desim_clean_up(void){
+void KnightSim_clean_up(void){
 
 	int i = 0;
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
 
-	//printf("DESim cleaning up\n");
+	//printf("KnightSim cleaning up\n");
 
 	LIST_FOR_EACH_L(ecdestroylist, i, 0)
 	{
-		ec_ptr = (eventcount*)desim_list_get(ecdestroylist, i);
+		ec_ptr = (eventcount*)KnightSim_list_get(ecdestroylist, i);
 
 		if(ec_ptr)
 			eventcount_destroy(ec_ptr);
@@ -510,17 +510,17 @@ void desim_clean_up(void){
 
 	LIST_FOR_EACH_L(ctxdestroylist, i, 0)
 	{
-		ctx_ptr = (context*)desim_list_get(ctxdestroylist, i);
+		ctx_ptr = (context*)KnightSim_list_get(ctxdestroylist, i);
 
 		if(ctx_ptr)
 			context_destroy(ctx_ptr);
 	}
 
-	desim_list_clear(ctxdestroylist);
-	desim_list_free(ctxdestroylist);
+	KnightSim_list_clear(ctxdestroylist);
+	KnightSim_list_free(ctxdestroylist);
 
-	desim_list_clear(ecdestroylist);
-	desim_list_free(ecdestroylist);
+	KnightSim_list_clear(ecdestroylist);
+	KnightSim_list_free(ecdestroylist);
 
 	return;
 }
@@ -632,9 +632,9 @@ void context_init(context *new_context){
 }
 
 
-//DESim Util Stuff
+//KnightSim Util Stuff
 
-list *desim_list_create(unsigned int size)
+list *KnightSim_list_create(unsigned int size)
 {
 	assert(size > 0);
 
@@ -650,7 +650,7 @@ list *desim_list_create(unsigned int size)
 }
 
 
-void desim_list_free(list *list_ptr)
+void KnightSim_list_free(list *list_ptr)
 {
 	free(list_ptr->name);
 	free(list_ptr->elem);
@@ -659,12 +659,12 @@ void desim_list_free(list *list_ptr)
 }
 
 
-int desim_list_count(list *list_ptr)
+int KnightSim_list_count(list *list_ptr)
 {
 	return list_ptr->count;
 }
 
-void desim_list_grow(list *list_ptr)
+void KnightSim_list_grow(list *list_ptr)
 {
 	void **nelem;
 	int nsize, i, index;
@@ -687,11 +687,11 @@ void desim_list_grow(list *list_ptr)
 	list_ptr->tail = list_ptr->count;
 }
 
-void desim_list_add(list *list_ptr, void *elem)
+void KnightSim_list_add(list *list_ptr, void *elem)
 {
 	/* Grow list if necessary */
 	if (list_ptr->count == list_ptr->size)
-		desim_list_grow(list_ptr);
+		KnightSim_list_grow(list_ptr);
 
 	/* Add element */
 	list_ptr->elem[list_ptr->tail] = elem;
@@ -701,7 +701,7 @@ void desim_list_add(list *list_ptr, void *elem)
 }
 
 
-int desim_list_index_of(list *list_ptr, void *elem)
+int KnightSim_list_index_of(list *list_ptr, void *elem)
 {
 	int pos;
 	int i;
@@ -718,7 +718,7 @@ int desim_list_index_of(list *list_ptr, void *elem)
 }
 
 
-void *desim_list_remove_at(list *list_ptr, int index)
+void *KnightSim_list_remove_at(list *list_ptr, int index)
 {
 	int shiftcount;
 	int pos;
@@ -754,19 +754,19 @@ void *desim_list_remove_at(list *list_ptr, int index)
 }
 
 
-void *desim_list_remove(list *list_ptr, void *elem)
+void *KnightSim_list_remove(list *list_ptr, void *elem)
 {
 	int index;
 
 	/* Get index of element */
-	index = desim_list_index_of(list_ptr, elem);
+	index = KnightSim_list_index_of(list_ptr, elem);
 
 	/* Delete element at found position */
-	return desim_list_remove_at(list_ptr, index);
+	return KnightSim_list_remove_at(list_ptr, index);
 }
 
 
-void desim_list_clear(list *list_ptr)
+void KnightSim_list_clear(list *list_ptr)
 {
 	list_ptr->count = 0;
 	list_ptr->head = 0;
@@ -774,22 +774,22 @@ void desim_list_clear(list *list_ptr)
 	return;
 }
 
-void desim_list_enqueue(list *list_ptr, void *elem)
+void KnightSim_list_enqueue(list *list_ptr, void *elem)
 {
-	desim_list_add(list_ptr, elem);
+	KnightSim_list_add(list_ptr, elem);
 }
 
 
-void *desim_list_dequeue(list *list_ptr)
+void *KnightSim_list_dequeue(list *list_ptr)
 {
 	if (!list_ptr->count)
 		return NULL;
 
-	return desim_list_remove_at(list_ptr, 0);
+	return KnightSim_list_remove_at(list_ptr, 0);
 }
 
 
-void *desim_list_get(list *list_ptr, int index)
+void *KnightSim_list_get(list *list_ptr, int index)
 {
 	/*Check bounds*/
 	if (index < 0 || index >= list_ptr->count)
@@ -801,7 +801,7 @@ void *desim_list_get(list *list_ptr, int index)
 }
 
 
-void desim_list_insert(list *list_ptr, int index, void *elem){
+void KnightSim_list_insert(list *list_ptr, int index, void *elem){
 
 	int shiftcount;
 	int pos;
@@ -812,7 +812,7 @@ void desim_list_insert(list *list_ptr, int index, void *elem){
 
 	/*Grow list if necessary*/
 	if(list_ptr->count == list_ptr->size)
-		desim_list_grow(list_ptr);
+		KnightSim_list_grow(list_ptr);
 
 	 /*Choose whether to shift elements on the right increasing 'tail', or
 	 * shift elements on the left decreasing 'head'.*/
