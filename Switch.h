@@ -2,12 +2,12 @@
 #ifndef SWITCH_H_
 #define SWITCH_H_
 
-#include <desim.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
+#include "KnightSim/knightsim.h"
 
 #define NUMSWITCHES 6
 

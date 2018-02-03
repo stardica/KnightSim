@@ -1,8 +1,6 @@
 #ifndef __DESim_H__
 #define __DESim_H__
 
-#include <pthread.h>
-
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 32768
 #endif
@@ -63,7 +61,7 @@ struct eventcount_t{
 	long long id;
 	struct list_t *ctxlist;
 	count_t count;		/* current value of event */
-	pthread_mutex_t count_mutex;
+	//pthread_mutex_t count_mutex;
 };
 
 //Context objects
@@ -79,20 +77,15 @@ struct context_t{
 	struct thread_t *thread;  /*for parallel execution*/
 };
 
-//threads
+/*//threads
 struct thread_t{
-	int id;	/*thread id for debugging*/
-	struct thread_t * self; /*pointer to myself*/
+	int id;	thread id for debugging
+	struct thread_t * self; pointer to myself
 	int return_val;
-	pthread_t thread_handle; /*my thread handle*/
-	struct context_t *context; /*The context I am to run*/
-	pthread_mutex_t run_mutex;
-	pthread_cond_t run;
-	pthread_mutex_t pause_mutex;
-	pthread_cond_t pause;
-	jmp_buf home; /*for returning to myself*/
+	struct context_t *context; The context I am to run
+	jmp_buf home; for returning to myself
 	struct context_t *last_context;
-};
+};*/
 
 typedef struct context_t context;
 typedef struct eventcount_t eventcount;
@@ -127,7 +120,7 @@ void context_end(jmp_buf buf);
 context *context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
-void desim_end(void);
+void desim_clean_up(void);
 
 //DESim/PDESim util stuff
 #define FFLUSH fflush(stderr); fflush(stdout);
