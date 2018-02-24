@@ -61,6 +61,7 @@ struct eventcount_t{
 	long long id;
 	struct list_t *ctxlist;
 	count_t count;		/* current value of event */
+	struct context_t *ctx_list;
 	//pthread_mutex_t count_mutex;
 };
 
@@ -74,18 +75,9 @@ struct context_t{
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
 	int stacksize;		/*stack size*/
-	struct thread_t *thread;  /*for parallel execution*/
+	struct context_t * batch_next;
 };
 
-/*//threads
-struct thread_t{
-	int id;	thread id for debugging
-	struct thread_t * self; pointer to myself
-	int return_val;
-	struct context_t *context; The context I am to run
-	jmp_buf home; for returning to myself
-	struct context_t *last_context;
-};*/
 
 typedef struct context_t context;
 typedef struct eventcount_t eventcount;
@@ -93,12 +85,18 @@ typedef struct list_t list;
 typedef struct thread_t thread;
 
 extern jmp_buf main_context;
+extern jmp_buf halt_context;
+
+extern context *current_context;
 
 extern list *ecdestroylist;
 
 extern eventcount *etime;
 
 #define CYCLE etime->count
+
+extern unsigned long long etime_start;
+extern unsigned long long etime_time;
 
 //KnightSim user level functions
 void KnightSim_init(void);
@@ -108,8 +106,10 @@ void simulate(void);
 void await(eventcount *ec, count_t value);
 void advance(eventcount *ec);
 void pause(count_t value);
+void context_init_halt(void);
 
 //KnightSim private functions
+void ctx_hash_insert(context *context_ptr, unsigned int where);
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
@@ -132,10 +132,10 @@ void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void fatal(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 
 #define LIST_FOR_EACH_L(list_ptr, iter, iter_start_value) \
-	for ((iter) = iter_start_value; (iter) < KnightSim_list_count((list_ptr)); (iter)++)
+	for ((iter) = iter_start_value; (iter) < (list_ptr->count); (iter)++)
 
 #define LIST_FOR_EACH_LG(list_ptr, iter, iter_start_value) \
-	for ((iter) = iter_start_value; (iter) <= KnightSim_list_count((list_ptr)); (iter)++)
+	for ((iter) = iter_start_value; (iter) <= (KnightSim_list_count(list_ptr)); (iter)++)
 
 #define INLIST(X) (((X) + list_ptr->size) % list_ptr->size)
 

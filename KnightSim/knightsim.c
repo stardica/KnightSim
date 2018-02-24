@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
+#include "../include/rdtsc.h"
 
 /* Globals*/
 list *ctxdestroylist = NULL;
@@ -23,14 +24,36 @@ context *terminated_context = NULL;
 eventcount *etime = NULL;
 
 jmp_buf main_context;
+jmp_buf halt_context;
 
 long long ecid = 0;
 long long ctxid = 0;
 long long threadid = 0;
 
+unsigned long long set_start = 0;
+unsigned long long set_time = 0;
+
+unsigned long long jmp_start = 0;
+unsigned long long jmp_time = 0;
+
+unsigned long long etime_start = 0;
+unsigned long long etime_time = 0;
+
+#define HASHSIZE 16
+#define HASHBY 0xF
+context *ctx_hash_table[HASHSIZE];
+unsigned int ctx_hash_table_count = 0;
+
+
 void KnightSim_init(void){
 
 	char buff[100];
+
+	//should be power of two
+	//hash table size should be a power of two
+	if((HASHSIZE & (HASHSIZE - 1)) != 0)
+		fatal("This is the optimized version of KnightSim.\n"
+				"HASHSIZE = %d but must be a power of two.\n", HASHSIZE);
 
 	//other globals
 	ctxdestroylist = KnightSim_list_create(4);
@@ -71,8 +94,6 @@ void KnightSim_dump_queues(void){
 	}
 	printf("\n");
 
-
-
 	return;
 }
 
@@ -91,6 +112,30 @@ eventcount *eventcount_create(char *name){
 
 	return ec_ptr;
 }
+
+void ctx_hash_insert(context *context_ptr, unsigned int where){
+
+	/*assert(context_ptr);
+	assert(context_ptr->batch_next == NULL);*/
+
+	if(!ctx_hash_table[where])
+	{
+		//nothing here
+		ctx_hash_table[where] = context_ptr;
+		ctx_hash_table[where]->batch_next = NULL;
+		ctx_hash_table_count++;
+	}
+	else
+	{
+		//something here stick it at the head
+		/*assert(context_ptr->count == ctx_hash_table[where]->count);*/
+		context_ptr->batch_next = ctx_hash_table[where]; //set new ctx as head
+		ctx_hash_table[where] = context_ptr; //move old ctx down
+	}
+
+	return;
+}
+
 
 void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
 
@@ -114,14 +159,34 @@ void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
 
 	context_init(new_context_ptr);
 
-	//put the new ctx in the global ctx list
-	//KnightSim_list_insert(ctxlist, 0, new_context_ptr);
+	//start up new context
+#if defined(__linux__) && defined(__i386__)
+	current_context = new_context_ptr;
+	if (!setjmp32_2(halt_context))
+	{
+	  longjmp32_2(new_context_ptr->buf, 1);
+	}
+#elif defined(__linux__) && defined(__x86_64)
+
+	current_context = new_context_ptr;
+	if (!setjmp64_2(halt_context))
+	{
+		longjmp64_2(new_context_ptr->buf, 1);
+	}
+#else
+#error Unsupported machine/OS combination
+#endif
+
+	//changes
+	assert(etime); //make sure the init is above any context create funcs
+	ctx_hash_insert(new_context_ptr, new_context_ptr->count & HASHBY);
+
 
 	//put in etime's ctx list
-	KnightSim_list_insert(etime->ctxlist, 0, new_context_ptr);
+	//KnightSim_list_enqueue(etime->ctxlist, new_context_ptr);
 
 	//for destroying the context later
-	KnightSim_list_insert(ctxdestroylist, 0, new_context_ptr);
+	KnightSim_list_enqueue(ctxdestroylist, new_context_ptr);
 
 	return;
 }
@@ -131,111 +196,75 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->name = ecname;
 	ec->id = ecid++;
 	ec->count = count;
+	ec->ctx_list = NULL;
 	ec->ctxlist = KnightSim_list_create(4);
-	//pthread_mutex_init(&ec->count_mutex, NULL); //only used for parallel implementations
     return;
 }
 
 void advance(eventcount *ec){
 
-	int i = 0;
-
 	/* advance the ec's count */
 	ec->count++;
 
-	/*check ec's ctx list*/
-	context *context_ptr = NULL;
-
 	/*if here, there is a ctx(s) waiting on this ec AND
-	 * its ready to run ready to run
+	 * its ready to run
 	 * find the end of the ec's task list
 	 * and set all ctx time to current time (etime.cout)*/
-	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
+
+	if(ec->ctx_list && ec->ctx_list->count == ec->count)
 	{
-		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
+		//there is a context on this ec and it's ready
 
-		if(context_ptr && (context_ptr->count == ec->count))
-		{
-			context_ptr = (context *)KnightSim_list_dequeue(ec->ctxlist);
-
-			//insert at head of etime ctx list this should run this cycle
-			context_ptr->count = etime->count;
-			KnightSim_list_insert(etime->ctxlist, 0, context_ptr);
-		}
-		else
-		{
-			//no context or context is not ready to run
-			//if(context_ptr)
-				//assert(context_ptr->count > ec->count);
-			break;
-		}
+		ec->ctx_list->batch_next = current_context->batch_next;
+		current_context->batch_next = ec->ctx_list;
+		ec->ctx_list =  NULL;
 	}
 
 	return;
 }
 
 
-void advance_old(eventcount *ec){
-
-	int i = 0;
-
-	/* advance the ec's count */
-	ec->count++;
-
-	/*check ec's ctx list*/
-	context *context_ptr = NULL;
-
-	/*if here, there is a ctx(s) waiting on this ec AND
-	 * its ready to run ready to run
-	 * find the end of the ec's task list
-	 * and set all ctx time to current time (etime.cout)*/
-	LIST_FOR_EACH_L(ec->ctxlist, i, 0)
-	{
-		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
-
-		if(context_ptr && (context_ptr->count == ec->count))
-		{
-			//printf("context_ptr->count %llu ec->count %llu name %s", context_ptr->count, ec->count, ec->name);
-			//fflush(stdout);
-			//assert(context_ptr->count == ec->count);
-			//context_ptr->count = etime->count;
-			context_ptr = (context *)KnightSim_list_dequeue(ec->ctxlist);
-			KnightSim_list_enqueue(ctxlist, context_ptr);
-		}
-		else
-		{
-			//no context or context is not ready to run
-			//if(context_ptr)
-				//assert(context_ptr->count > ec->count);
-			break;
-		}
-	}
-
-	return;
-}
 
 void context_terminate(void){
 
 	/*we are deliberately allowing a context to terminate it self
 	destroy the context and switch to the next context*/
 
-	//context *ctx_ptr = NULL;
+	//set curr ctx to next ctx in list (NOTE MAYBE NULL!!)
+	current_context = current_context->batch_next; //drops this context
 
-	/*remove from global ctx and destroy lists*/
-	//ctx_ptr = (context*)KnightSim_list_remove_at(ctxlist, 0);
-	/*ctx_ptr = (context*)KnightSim_list_remove(ctxdestroylist, ctx_ptr);*/
-	//assert(last_context == ctx_ptr);
-	//assert(ctx_ptr != NULL);
 
-	/*Its ok to leave the context and eventcounts.
-	 the will be destroyed on exit*/
-
-	//context_destroy(ctx_ptr);
-
-	/*switch to next context simulation should continue*/
-	context_switch(context_select());
+	if(current_context)
+	{
+		context_switch(current_context);
+	}
+	else
+	{
+		etime->count++;
+		context_switch(context_select());
+	}
 
 	return;
+}
+
+void context_init_halt(void){
+
+	//set up new context
+#if defined(__linux__) && defined(__i386__)
+	if (!setjmp32_2(current_context->buf))
+	{
+	  longjmp32_2(halt_context, 1);
+	}
+#elif defined(__linux__) && defined(__x86_64)
+	if (!setjmp64_2(current_context->buf))
+	{
+		longjmp64_2(halt_context, 1);
+	}
+#else
+#error Unsupported machine/OS combination
+#endif
+
+
 }
 
 
@@ -267,19 +296,46 @@ void eventcount_destroy(eventcount *ec_ptr){
 	return;
 }
 
-
-
 context *context_select(void){
+
+	/*get next ctx to run*/
+	if(ctx_hash_table_count)
+	{
+		do
+		{
+			current_context = ctx_hash_table[etime->count & HASHBY];
+
+		}while(!current_context && etime->count++);
+
+		ctx_hash_table[etime->count & HASHBY] = NULL;
+		ctx_hash_table_count--;
+	}
+	else
+	{
+		//simulation has ended
+		etime->count--;
+		context_end(main_context);
+	}
+
+	//printf("************etime****************** cycle %llu\n", etime->count);
+
+	//get count of batch
+	//assert(etime->count == current_context->count);
+	return current_context;
+}
+
+
+context *context_select_old(void){
 
 	/*get next ctx to run*/
 	current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
 
-	if(current_context)
+	//printf("got context %s\n", current_context->name);
+
+	if(!current_context)
 	{
-		etime->count = current_context->count;
-	}
-	else
-	{
+		context_end(main_context);
+
 		/*if there isn't a ctx in etime's ctx list the simulation is
 				deadlocked this is a user simulation implementation problem*/
 		printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
@@ -287,95 +343,37 @@ context *context_select(void){
 		context_end(main_context);
 	}
 
+	etime->count = current_context->count;
 	return current_context;
 }
 
-context *context_select_old(void){
-
-	//long long next_ctx_count = 0;
-
-	// size = 0;
-
-	context * next_context_ptr = NULL;
-
-	/*get next ctx to run*/
-	current_context = (context*)KnightSim_list_get(ctxlist, 0);
-
-	if(!current_context)
-	{
-		//printf("processing %llu\n", CYCLE);
-
-		/*if there isn't a ctx on the global context list
-		we are ready to advance in cycles, pull from etime*/
-		current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
-
-		//put all ready ctx from etime to ctxlist
-		if(current_context)
-		{
-			etime->count = current_context->count;
-
-			/*put at head of ec's ctx list*/
-			KnightSim_list_insert(ctxlist, 0, current_context);
-
-			//Pull any other contexts that have the same count as the first
-			int size = KnightSim_list_count(etime->ctxlist);
-
-			for(int i = 0; i < size; i++)
-			{
-				next_context_ptr = (context*)KnightSim_list_get(etime->ctxlist, 0);
-
-				if(next_context_ptr && (etime->count == next_context_ptr->count))
-				{
-					current_context = (context*)KnightSim_list_remove(etime->ctxlist, next_context_ptr);
-					/*put at head of ec's ctx list*/
-					KnightSim_list_insert(ctxlist, 0, current_context);
-				}
-				else
-				{
-					break;
-				}
-			}
-		}
-		else
-		{
-			/*if there isn't a ctx in etime's ctx list the simulation is
-					deadlocked this is a user simulation implementation problem*/
-			printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
-					"Simulation has either ended or there is a problem with the simulation implementation.\n");
-			context_end(main_context);
-		}
-	}
-
-	return current_context;
-}
 
 void pause(count_t value){
-
 	//we only ever pause on etime.
 
-	//get the current running context
-	context *context_ptr = NULL;
-	int i = 0;
+	//update value to etime's count
+	value += etime->count;
 
-	//etime has a new size
-	LIST_FOR_EACH_LG(etime->ctxlist, i, 0)
+	//Get a pointer to next context first NOTE MAYBE NULLL!!!!
+	context *top_context = current_context;
+	current_context = current_context->batch_next;
+
+	//top_context->count = value;
+
+	//insert my self into the hash table
+	ctx_hash_insert(top_context, value & HASHBY);
+
+	if(current_context)
 	{
-		context_ptr = (context *)KnightSim_list_get(etime->ctxlist, i);
-
-		if(!context_ptr || (context_ptr && value < context_ptr->count))
-		{
-			/*we are at the head or tail of the list
-			insert ctx at this position*/
-
-			//set the curctx's value
-			current_context->count = etime->count + value;
-			KnightSim_list_insert(etime->ctxlist, i, current_context);
-			break;
-		}
-
+		//if there is another context run it
+		context_switch(current_context);
 	}
-
-	context_switch(context_select());
+	else
+	{
+		//we are out of contexts so get the next batch
+		etime->count++;
+		context_switch(context_select());
+	}
 
 	return;
 }
@@ -385,7 +383,6 @@ void await(eventcount *ec, count_t value){
 
 	/*todo
 	check for stack overflows*/
-	//assert(ec);
 
 	/*continue if the ctx's count is less
 	 * than or equal to the ec's count*/
@@ -393,92 +390,64 @@ void await(eventcount *ec, count_t value){
 		return;
 
 	/*the current context must now wait on this ec to be incremented*/
-
-	/*we are here because of an await
-	stop the currect context and drop it into
-	the ec that this context is awaiting
-
-	determine if the ec has another context
-	in its awaiting ctx list*/
-	context *context_ptr = NULL;
-	int i = 0;
-
-	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
+	if(!ec->ctx_list)
 	{
-		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
+		//printf("await(): fixme handle more than one ctx in ec list name %s in ec %s\n",
+		//current_context->name, ec->ctx_list->name);
 
-		if(!context_ptr || (context_ptr && value < context_ptr->count))
-		{
-			/*we are at the head or tail of the list
-			insert ctx at this position*/
-			//context_ptr = (context *)KnightSim_list_dequeue(etime->ctxlist);
+		//nothing in EC's list
+		/*printf("await %s\n", current_context->name);*/
 
-			//set the curctx's value
-			current_context->count = value;
-			KnightSim_list_insert(ec->ctxlist, i, current_context);
-			break;
-		}
+		//set the count to await
+		current_context->count = value;
+
+		//have ec point to halting context
+		ec->ctx_list = current_context;
+
+		//set curr ctx to next ctx in list (NOTE MAYBE NULL!!)
+		current_context = current_context->batch_next;
+
+		//update the tail pointer in ec's ctx list
+		//ec->ctx_list->batch_next = NULL;
 
 	}
-
-	context_switch(context_select());
-
-	return;
-}
-
-void pause_old(count_t value){
-
-	await(etime, etime->count + value);
-
-	return;
-}
-
-void await_old(eventcount *ec, count_t value){
-
-	/*todo
-	check for stack overflows*/
-	//assert(ec);
-
-	/*continue if the ctx's count is less
-	 * than or equal to the ec's count*/
-	if (ec->count >= value)
-		return;
-
-	/*the current context must now wait on this ec to be incremented*/
-
-	/*we are here because of an await
-	stop the currect context and drop it into
-	the ec that this context is awaiting
-
-	determine if the ec has another context
-	in its awaiting ctx list*/
-	context *context_ptr = NULL;
-	int i = 0;
-
-	LIST_FOR_EACH_LG(ec->ctxlist, i, 0)
+	else
 	{
-		context_ptr = (context *)KnightSim_list_get(ec->ctxlist, i);
-		if(!context_ptr || (context_ptr && value < context_ptr->count))
-		{
-			/*we are at the head or tail of the list
-			insert ctx at this position*/
-			context_ptr = (context *)KnightSim_list_dequeue(ctxlist);
-
-			//set the curctx's value
-			context_ptr->count = value;
-			KnightSim_list_insert(ec->ctxlist, i, context_ptr);
-			break;
-		}
-
+		//there is an ec waiting.
+		fatal("await(): fixme handle more than one ctx in ec list name %s in ec %s id %d\n",
+				current_context->name, ec->ctx_list->name, ec->ctx_list->id);
 	}
 
-	context_switch(context_select());
+	if(current_context)
+	{
+		//if there is another context run it
+		context_switch(current_context);
+	}
+	else
+	{
+		//we are out of contexts so get the next batch
+		etime->count++;
+		context_switch(context_select());
+	}
 
 	return;
 }
+
 
 
 void simulate(void){
+
+	current_context = NULL;
+	last_context = NULL;
+
+	/*while(ctx_hash_table[0])
+	{
+		printf("ctx name %s\n", ctx_hash_table[0]->name);
+		ctx_hash_table[0] = ctx_hash_table[0]->batch_next;
+	}
+
+	fatal("GOOD\n");*/
+
 
 	//simulate
 	if(!context_simulate(main_context))
@@ -526,30 +495,16 @@ void KnightSim_clean_up(void){
 }
 
 
-/*void thread_destroy(thread * thread_ptr){
-
-	thread_ptr->self = NULL;
-	thread_ptr->context = NULL;
-	thread_ptr->last_context = NULL;
-	free(thread_ptr);
-	return;
-}*/
-
-
 void context_start(void){
 
-	/*if(terminated_context)
-	{
-		context_destroy (terminated_context);
-		terminated_context = NULL;
-	}*/
+	//start of the context...
 
 	(*current_context->start)();
 
 	/*if current current ctx returns i.e. hits the bottom of its function
 	it will return here. Then we need to terminate the simulation*/
 
-	context_end(main_context);
+	context_terminate();
 
 	return;
 }
@@ -621,9 +576,11 @@ void context_init(context *new_context){
 #if defined(__linux__) && defined(__i386__)
 	new_context->buf[5] = ((int)context_start);
 	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
+
 #elif defined(__linux__) && defined(__x86_64)
 	new_context->buf[7] = (long long)context_start;
 	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4);
+
 #else
 #error Unsupported machine/OS combination
 #endif
