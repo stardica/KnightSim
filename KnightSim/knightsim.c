@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <unistd.h>
 #include "../include/rdtsc.h"
 
 /* Globals*/
@@ -137,7 +136,7 @@ void ctx_hash_insert(context *context_ptr, unsigned int where){
 }
 
 
-void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
+void context_create(void (*func)(context *), unsigned stacksize, char *name, int id){
 
 	/*stacksize should be multiple of unsigned size */
 	assert ((stacksize % sizeof(unsigned)) == 0);
@@ -156,6 +155,15 @@ void context_create(void (*func)(void), unsigned stacksize, char *name, int id){
 	new_context_ptr->stacksize = stacksize;
 	new_context_ptr->magic = STK_OVFL_MAGIC; // for stack overflow check
 	new_context_ptr->start = func; /*assigns the head of a function*/
+
+	//move data unto the context's stack
+	context_data * context_data_ptr = (context_data *) malloc(sizeof(context_data));
+	context_data_ptr->ctx_ptr = new_context_ptr;
+	context_data_ptr->context_id = new_context_ptr->id;//new_context_ptr->id;
+
+	//copy data to context's stack then free the local copy.
+	memcpy((void *)new_context_ptr->stack, context_data_ptr, sizeof(context_data));
+	free(context_data_ptr);
 
 	context_init(new_context_ptr);
 
@@ -201,7 +209,7 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
     return;
 }
 
-void advance(eventcount *ec){
+void advance(eventcount *ec, context *my_ctx){
 
 	/* advance the ec's count */
 	ec->count++;
@@ -215,8 +223,8 @@ void advance(eventcount *ec){
 	{
 		//there is a context on this ec and it's ready
 
-		ec->ctx_list->batch_next = current_context->batch_next;
-		current_context->batch_next = ec->ctx_list;
+		ec->ctx_list->batch_next = my_ctx->batch_next;
+		my_ctx->batch_next = ec->ctx_list;
 		ec->ctx_list =  NULL;
 	}
 
@@ -225,16 +233,26 @@ void advance(eventcount *ec){
 
 
 
-void context_terminate(void){
+void context_terminate(context * my_ctx){
 
 	/*we are deliberately allowing a context to terminate it self
 	destroy the context and switch to the next context*/
 
 	//set curr ctx to next ctx in list (NOTE MAYBE NULL!!)
-	current_context = current_context->batch_next; //drops this context
+	my_ctx = my_ctx->batch_next; //drops this context
+
+	if(my_ctx)
+	{
+		long_jump(my_ctx->buf);
+	}
+	else
+	{
+		etime->count++;
+		long_jump(context_select());
+	}
 
 
-	if(current_context)
+	/*if(current_context)
 	{
 		context_switch(current_context);
 	}
@@ -242,21 +260,21 @@ void context_terminate(void){
 	{
 		etime->count++;
 		context_switch(context_select());
-	}
+	}*/
 
 	return;
 }
 
-void context_init_halt(void){
+void context_init_halt(context * my_ctx){
 
 	//set up new context
 #if defined(__linux__) && defined(__i386__)
-	if (!setjmp32_2(current_context->buf))
+	if (!setjmp32_2(my_ctx->buf))
 	{
 	  longjmp32_2(halt_context, 1);
 	}
 #elif defined(__linux__) && defined(__x86_64)
-	if (!setjmp64_2(current_context->buf))
+	if (!setjmp64_2(my_ctx->buf))
 	{
 		longjmp64_2(halt_context, 1);
 	}
@@ -296,7 +314,7 @@ void eventcount_destroy(eventcount *ec_ptr){
 	return;
 }
 
-context *context_select(void){
+void * context_select(void){
 
 	/*get next ctx to run*/
 	if(ctx_hash_table_count)
@@ -321,7 +339,7 @@ context *context_select(void){
 
 	//get count of batch
 	//assert(etime->count == current_context->count);
-	return current_context;
+	return (void *)current_context->buf;
 }
 
 
@@ -348,22 +366,38 @@ context *context_select_old(void){
 }
 
 
-void pause(count_t value){
+void pause(count_t value, context * my_ctx){
 	//we only ever pause on etime.
 
 	//update value to etime's count
 	value += etime->count;
 
 	//Get a pointer to next context first NOTE MAYBE NULLL!!!!
-	context *top_context = current_context;
-	current_context = current_context->batch_next;
+	context *head_ptr = my_ctx;
+	my_ctx = my_ctx->batch_next;
 
 	//top_context->count = value;
 
 	//insert my self into the hash table
-	ctx_hash_insert(top_context, value & HASHBY);
+	ctx_hash_insert(head_ptr, value & HASHBY);
 
-	if(current_context)
+
+	if(!set_jump(head_ptr->buf)) //update current context
+	{
+		if(my_ctx)
+		{
+			long_jump(my_ctx->buf);
+		}
+		else
+		{
+			/*fatal("fix me pause\n");*/
+			etime->count++;
+
+			long_jump(context_select());
+		}
+	}
+
+	/*if(current_context)
 	{
 		//if there is another context run it
 		context_switch(current_context);
@@ -373,13 +407,13 @@ void pause(count_t value){
 		//we are out of contexts so get the next batch
 		etime->count++;
 		context_switch(context_select());
-	}
+	}*/
 
 	return;
 }
 
 
-void await(eventcount *ec, count_t value){
+void await(eventcount *ec, count_t value, context *my_ctx){
 
 	/*todo
 	check for stack overflows*/
@@ -399,13 +433,13 @@ void await(eventcount *ec, count_t value){
 		/*printf("await %s\n", current_context->name);*/
 
 		//set the count to await
-		current_context->count = value;
+		my_ctx->count = value;
 
 		//have ec point to halting context
-		ec->ctx_list = current_context;
+		ec->ctx_list = my_ctx;
 
 		//set curr ctx to next ctx in list (NOTE MAYBE NULL!!)
-		current_context = current_context->batch_next;
+		my_ctx = my_ctx->batch_next;
 
 		//update the tail pointer in ec's ctx list
 		//ec->ctx_list->batch_next = NULL;
@@ -418,7 +452,20 @@ void await(eventcount *ec, count_t value){
 				current_context->name, ec->ctx_list->name, ec->ctx_list->id);
 	}
 
-	if(current_context)
+	if(!set_jump(ec->ctx_list->buf)) //update current context
+	{
+		if(my_ctx) //if there is another context run it
+		{
+			long_jump(my_ctx->buf);
+		}
+		else //we are out of contexts so get the next batch
+		{
+			etime->count++;
+			long_jump(context_select());
+		}
+	}
+
+	/*if(current_context)
 	{
 		//if there is another context run it
 		context_switch(current_context);
@@ -428,7 +475,7 @@ void await(eventcount *ec, count_t value){
 		//we are out of contexts so get the next batch
 		etime->count++;
 		context_switch(context_select());
-	}
+	}*/
 
 	return;
 }
@@ -437,8 +484,8 @@ void await(eventcount *ec, count_t value){
 
 void simulate(void){
 
-	current_context = NULL;
-	last_context = NULL;
+	/*current_context = NULL;
+	last_context = NULL;*/
 
 	/*while(ctx_hash_table[0])
 	{
@@ -454,7 +501,8 @@ void simulate(void){
 	{
 		/*This is the beginning of the simulation
 		 * get the first ctx and run it*/
-		context_switch(context_select());
+
+		long_jump(context_select());
 	}
 
 	return;
@@ -498,13 +546,48 @@ void KnightSim_clean_up(void){
 void context_start(void){
 
 	//start of the context...
+#if defined(__linux__) && defined(__x86_64)
+	long long address = get_stack_ptr64() - (DEFAULT_STACK_SIZE - sizeof(context_data) - MAGIC_STACK_NUMBER);
+	context_data * context_data_ptr = (context_data *)address;
 
-	(*current_context->start)();
+	//jump
+	(*context_data_ptr->ctx_ptr->start)(context_data_ptr->ctx_ptr);
 
 	/*if current current ctx returns i.e. hits the bottom of its function
-	it will return here. Then we need to terminate the simulation*/
+	it will return here. So, terminate the context and move on*/
+	context_terminate(context_data_ptr->ctx_ptr);
 
-	context_terminate();
+#else
+
+	fatal("context_start(): need to make get stack 32\n");
+#endif
+
+	fatal("context_start(): Should never be here!\n");
+
+	return;
+}
+
+
+int set_jump(jmp_buf buf){
+
+#if defined(__linux__) && defined(__i386__)
+	return setjmp32_2(buf);
+#elif defined(__linux__) && defined(__x86_64)
+	return setjmp64_2(buf);
+#else
+#error Unsupported machine/OS combination
+#endif
+}
+
+void long_jump(jmp_buf buf){
+
+#if defined(__linux__) && defined(__i386__)
+	longjmp32_2(buf, 1);
+#elif defined(__linux__) && defined(__x86_64)
+	longjmp64_2(buf, 1);
+#else
+#error Unsupported machine/OS combination
+#endif
 
 	return;
 }
@@ -575,11 +658,11 @@ void context_init(context *new_context){
 
 #if defined(__linux__) && defined(__i386__)
 	new_context->buf[5] = ((int)context_start);
-	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - 4));
+	new_context->buf[4] = ((int)((char*)new_context->stack + new_context->stacksize - MAGIC_STACK_NUMBER));
 
 #elif defined(__linux__) && defined(__x86_64)
 	new_context->buf[7] = (long long)context_start;
-	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - 4);
+	new_context->buf[6] = (long long)((char *)new_context->stack + new_context->stacksize - MAGIC_STACK_NUMBER);
 
 #else
 #error Unsupported machine/OS combination

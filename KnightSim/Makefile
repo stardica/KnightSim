@@ -1,16 +1,16 @@
 #compiler and linker
 CC_FLAGS_64 = -g3 -O3 -Wall -Werror
 CC_FLAGS_32 = -g3 -O3 -Wall -Werror -m32
-CC = g++
+CC = gcc
 
 #DEsim
 LIB_NAME_64 = "libKnightSim64.a"
 LIB_NAME_32 = "libKnightSim32.a"
 
-all: makedir knightsim64 knightsim32
+all: makedir knightsim64
 
-knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o
-		ar -r ../lib/$(LIB_NAME_64) knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o
+knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stack_ptr64.o
+		ar -r ../lib/$(LIB_NAME_64) knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stack_ptr64.o
 		@echo "Built $@ successfully"
 
 knightsim32: knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o
@@ -37,6 +37,9 @@ decode64.o: decode64.s
 
 encode64.o: encode64.s
 	$(CC) $(CC_FLAGS_64) encode64.s -c
+	
+get_stack_ptr64.o: get_stack_ptr64.s
+	$(CC) $(CC_FLAGS_SO_64) get_stack_ptr64.s -c
 
 
 #32 bit versions

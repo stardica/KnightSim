@@ -3,8 +3,10 @@
 #include <string.h>
 #include <string.h>
 
+/*
 #include <cstdlib>
 #include <ctime>
+*/
 
 #include <knightsim.h>
 #include <rdtsc.h>
@@ -18,7 +20,7 @@
 
 #define STACKSIZE 16384
 
-void event(void);
+void event(context * my_ctx);
 void event_init(void);
 
 long long p_pid = 0;
@@ -65,18 +67,18 @@ void event_init(void){
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "events_%d", i);
-		context_create(event, STACKSIZE, strdup(buff), i);
+		context_create(event, DEFAULT_STACK_SIZE, strdup(buff), i);
 	}
 
 	return;
 }
 
 
-void event(void){
+void event(context * my_ctx){
 
 	//int my_pid = p_pid++;
 	/*count_t i = 1;*/
-	context_init_halt();
+	context_init_halt(my_ctx);
 
 	while(CYCLE < TOTAL_CYCLES)
 	{
@@ -84,7 +86,7 @@ void event(void){
 		//iters++;
 
 		//printf("event %d cycle %llu\n", my_pid, CYCLE);
-		pause(1);
+		pause(1, my_ctx);
 
 
 

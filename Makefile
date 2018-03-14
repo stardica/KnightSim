@@ -3,7 +3,7 @@ LIB_DIR = ./lib/
 INCLUDE_DIR = ./include/
 
 CC_FLAGS_64 = -g3 -O3 -Wall
-CC = g++
+CC = gcc
 LINKER_FLAGS_64 = -lKnightSim64
 
 all: 

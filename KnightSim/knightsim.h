@@ -2,7 +2,7 @@
 #define __KnightSim_H__
 
 #ifndef DEFAULT_STACK_SIZE
-#define DEFAULT_STACK_SIZE 32768
+#define DEFAULT_STACK_SIZE 16384
 #endif
 
 #define STK_OVFL_MAGIC 0x12349876 /* stack overflow check */
@@ -30,17 +30,19 @@ the stack pointer and instruction pointer are
 all we really care about.*/
 #if defined(__linux__) && defined(__x86_64)
 
-extern "C" int setjmp64_2(jmp_buf __env);
-extern "C" void longjmp64_2(jmp_buf __env, int val);
-extern "C"  long long encode64(long long val);
-extern "C" long long decode64(long long val);
+int setjmp64_2(jmp_buf __env);
+void longjmp64_2(jmp_buf __env, int val);
+long long encode64(long long val);
+long long decode64(long long val);
+long long get_stack_ptr64(void);
 
 #elif defined(__linux__) && defined(__i386__)
 
-extern "C" int setjmp32_2(jmp_buf __env);
-extern "C" void longjmp32_2(jmp_buf __env, int val);
-extern "C" int encode32(int val);
-extern "C" int decode32(int val);
+int setjmp32_2(jmp_buf __env);
+void longjmp32_2(jmp_buf __env, int val);
+int encode32(int val);
+int decode32(int val);
+//long long get_stack_ptr32(void);
 
 #else
 #error Unsupported machine/OS combination
@@ -71,7 +73,7 @@ struct context_t{
 	char *name;			/* task name */
 	int id;				/* task id */
 	count_t count;		/* argument to await */
-	void (*start)(void);	/*entry point*/
+	void (*start)(struct context_t *);	/*entry point*/
 	unsigned magic;		/* stack overflow check */
 	char *stack;		/*stack */
 	int stacksize;		/*stack size*/
@@ -79,6 +81,15 @@ struct context_t{
 };
 
 
+struct context_data_t{
+
+	struct context_t * ctx_ptr;
+	int context_id;
+};
+
+#define MAGIC_STACK_NUMBER 4
+
+typedef struct context_data_t context_data;
 typedef struct context_t context;
 typedef struct eventcount_t eventcount;
 typedef struct list_t list;
@@ -95,37 +106,36 @@ extern eventcount *etime;
 
 #define CYCLE etime->count
 
-extern unsigned long long etime_start;
-extern unsigned long long etime_time;
-
 //KnightSim user level functions
 void KnightSim_init(void);
 eventcount *eventcount_create(char *name);
-void context_create(void (*func)(void), unsigned stacksize, char *name, int id);
+void context_create(void (*func)(context *), unsigned stacksize, char *name, int id);
 void simulate(void);
-void await(eventcount *ec, count_t value);
-void advance(eventcount *ec);
-void pause(count_t value);
-void context_init_halt(void);
+void await(eventcount *ec, count_t value, context *my_ctx);
+void advance(eventcount *ec, context *my_ctx);
+void pause(count_t value, context *my_ctx);
+void context_init_halt(context *my_ctx);
 
 //KnightSim private functions
 void ctx_hash_insert(context *context_ptr, unsigned int where);
 void eventcount_init(eventcount * ec, count_t count, char *ecname);
 void eventcount_destroy(eventcount *ec);
 void context_init(context *new_context);
+void context_terminate(context *my_ctx);
 void context_start(void);
-void context_terminate(void);
 int context_simulate(jmp_buf buf);
 void context_end(jmp_buf buf);
-context *context_select(void);
+void * context_select(void);
 void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
 void KnightSim_clean_up(void);
 
+int set_jump(jmp_buf buf);
+void long_jump(jmp_buf buf);
+
 //KnightSim/PKnightSim util stuff
 #define FFLUSH fflush(stderr); fflush(stdout);
 
-void KnightSim_pause(void);
 void KnightSim_dump_queues(void);
 
 void warning(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
