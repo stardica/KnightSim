@@ -1,4 +1,5 @@
 #include "Switch.h"
+#include "../include/rdtsc.h"
 
 int producer_pid = 0;
 int switch_pid = 0;
@@ -15,11 +16,10 @@ eventcount **switch_ec;
 int main(void){
 
 	//user must initialize DESim
-	desim_init();
-
+	KnightSim_init();
 	switch_init();
-
 	switch_producer_init();
+
 
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
@@ -41,10 +41,10 @@ packet *switch_io_ctrl_get_packet(struct switch_t *switches, enum port_name port
 	switch(current_io_lane)
 	{
 		case io_request:
-			net_packet = (packet *)desim_list_get(switches->tx_request_queues[port], 0);
+			net_packet = (packet *)KnightSim_list_get(switches->tx_request_queues[port], 0);
 			break;
 		case io_reply:
-			net_packet = (packet *)desim_list_get(switches->tx_reply_queues[port], 0);
+			net_packet = (packet *)KnightSim_list_get(switches->tx_reply_queues[port], 0);
 			break;
 		case io_invalid_lane:
 		default:
@@ -154,7 +154,7 @@ list *switch_io_get_next_rx_queue(struct switch_t *switches, enum port_name port
 }
 
 
-void switch_io_ctrl(void){
+void switch_io_ctrl(context * my_ctx){
 
 	int total_ports = NUMPORTS * NUMSWITCHES;
 
@@ -180,12 +180,18 @@ void switch_io_ctrl(void){
 
 	//printf("switch_io_ctrl sw %d port %d init\n", switch_pid, port_pid);
 
+	context_init_halt(my_ctx);
+
 	while(1)
 	{
-		await(__switch[switch_pid]->switch_io_ec[port_pid], step);
-
+		set_time = rdtsc() - set_start;
+		await(__switch[switch_pid]->switch_io_ec[port_pid], step, my_ctx);
+		/*printf("test %llu\n", set_time);
+		getchar();
+*/
 		//switch has been advanced
-		P_PAUSE(1);
+		P_PAUSE(1, my_ctx);
+		set_start = rdtsc();
 
 		net_packet = switch_io_ctrl_get_packet(__switch[switch_pid], (enum port_name)port_pid, current_lane);
 
@@ -209,33 +215,33 @@ void switch_io_ctrl(void){
 
 		if(port_pid == east_queue || port_pid == west_queue)
 		{
-			if(desim_list_count(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane)) >= MAXQUEUEDEPTH)
+			if(KnightSim_list_count(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane)) >= MAXQUEUEDEPTH)
 			{
-				P_PAUSE(1);
+				P_PAUSE(1, my_ctx);
 			}
 			else
 			{
 				step++;
 
-				P_PAUSE(transfer_time);
+				P_PAUSE(transfer_time, my_ctx);
 
-				net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
-				desim_list_enqueue(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
+				net_packet = (packet *)KnightSim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
+				KnightSim_list_enqueue(switch_io_get_next_rx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
 
 				if(port_pid == east_queue)
-					advance(switch_ec[__switch[switch_pid]->next_west]);
+					advance(switch_ec[__switch[switch_pid]->next_west], my_ctx);
 				else
-					advance(switch_ec[__switch[switch_pid]->next_east]);
+					advance(switch_ec[__switch[switch_pid]->next_east], my_ctx);
 			}
 		}
 		else
 		{
 			step++;
-			P_PAUSE(transfer_time);
+			P_PAUSE(transfer_time, my_ctx);
 			packets_received++;
 
 			//destroy the packet
-			net_packet = (packet *)desim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
+			net_packet = (packet *)KnightSim_list_remove(switch_io_ctrl_get_tx_queue(__switch[switch_pid], (enum port_name)port_pid, current_lane), net_packet);
 
 			network_packet_destroy(net_packet);
 		}
@@ -248,7 +254,7 @@ void switch_io_ctrl(void){
 }
 
 
-void switch_ctrl(void){
+void switch_ctrl(context * my_ctx){
 
 	int my_pid = switch_pid++;
 
@@ -261,23 +267,25 @@ void switch_ctrl(void){
 	//packet *packet_ptr = NULL;
 	//printf("switch_ctrl %d init\n", my_pid);
 
+	context_init_halt(my_ctx);
+
 	while(1)
 	{
-		await(switch_ec[my_pid], step);
+		await(switch_ec[my_pid], step, my_ctx);
 		/*printf("ec count %llu step %llu\n", switch_ec->count, step);*/
 
 		/*wait and enter the subclock domain
 		to see if anyone else advance the switch this cycle*/
-		ENTER_SUB_CLOCK
+		ENTER_SUB_CLOCK(my_ctx)
 
 		/*models a cross bar link as many inputs to outputs
 		as possible in a given cycle*/
 		switch_crossbar_link(__switch[my_pid]);
 
-		EXIT_SUB_CLOCK
+		EXIT_SUB_CLOCK(my_ctx)
 
 		//charge latency
-		P_PAUSE(__switch[my_pid]->latency);
+		P_PAUSE(__switch[my_pid]->latency, my_ctx);
 
 		for(i = 0; i < __switch[my_pid]->crossbar->num_ports; i++)
 		{
@@ -288,7 +296,7 @@ void switch_ctrl(void){
 				move the packet from the input queue to the correct output queue*/
 
 				//careful here, the next line is for the INPUT queue...
-				net_packet = (packet *)desim_list_remove_at(switch_get_rx_queue(__switch[my_pid], crossbar_get_port_link_status(__switch[my_pid])), 0);
+				net_packet = (packet *)KnightSim_list_remove_at(switch_get_rx_queue(__switch[my_pid], crossbar_get_port_link_status(__switch[my_pid])), 0);
 				assert(net_packet);
 
 				/*enum port_name{
@@ -310,9 +318,9 @@ void switch_ctrl(void){
 				//get a pointer to the output queue
 				out_queue = switch_get_tx_queue(__switch[my_pid], __switch[my_pid]->crossbar->current_port);
 
-				desim_list_enqueue(out_queue, net_packet);
+				KnightSim_list_enqueue(out_queue, net_packet);
 
-				advance(__switch[my_pid]->switch_io_ec[__switch[my_pid]->crossbar->current_port]);
+				advance(__switch[my_pid]->switch_io_ec[__switch[my_pid]->crossbar->current_port], my_ctx);
 				net_packet = NULL;
 
 			}
@@ -583,7 +591,7 @@ void switch_set_link(struct switch_t *__switch, enum port_name tx_port){
 	switch(__switch->next_crossbar_lane)
 	{
 		case crossbar_request: //if the dest port queue isn't full and it hasn't previously been linked then link it.
-			if((desim_list_count(__switch->tx_request_queues[tx_port]) < MAXQUEUEDEPTH) && (__switch->crossbar->out_port_linked_queues[tx_port] == invalid_queue))
+			if((KnightSim_list_count(__switch->tx_request_queues[tx_port]) < MAXQUEUEDEPTH) && (__switch->crossbar->out_port_linked_queues[tx_port] == invalid_queue))
 			{
 					//links input port to output port
 					__switch->crossbar->out_port_linked_queues[tx_port] = __switch->current_queue;
@@ -593,7 +601,7 @@ void switch_set_link(struct switch_t *__switch, enum port_name tx_port){
 			}
 			break;
 		case crossbar_reply:
-			if((desim_list_count(__switch->tx_reply_queues[tx_port]) < MAXQUEUEDEPTH) && (__switch->crossbar->out_port_linked_queues[tx_port] == invalid_queue))
+			if((KnightSim_list_count(__switch->tx_reply_queues[tx_port]) < MAXQUEUEDEPTH) && (__switch->crossbar->out_port_linked_queues[tx_port] == invalid_queue))
 			{
 					__switch->crossbar->out_port_linked_queues[tx_port] = __switch->current_queue;
 					__switch->crossbar->num_links++;
@@ -687,10 +695,10 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 	switch(__switch->next_crossbar_lane)
 	{
 		case crossbar_request:
-			net_packet = (packet *)desim_list_get(__switch->rx_request_queues[__switch->current_queue], 0);
+			net_packet = (packet *)KnightSim_list_get(__switch->rx_request_queues[__switch->current_queue], 0);
 			break;
 		case crossbar_reply:
-			net_packet = (packet *)desim_list_get(__switch->rx_reply_queues[__switch->current_queue], 0);
+			net_packet = (packet *)KnightSim_list_get(__switch->rx_reply_queues[__switch->current_queue], 0);
 			break;
 		case crossbar_invalid_lane:
 		default:
@@ -701,7 +709,7 @@ packet *switch_get_rx_packet(struct switch_t *__switch){
 	return net_packet;
 }
 
-void switch_producer_ctrl(void){
+void switch_producer_ctrl(context * my_ctx){
 
 	int my_pid = producer_pid++;
 
@@ -710,6 +718,8 @@ void switch_producer_ctrl(void){
 	int dest[2] = {0,0};
 
 	packet *packet_ptr = NULL;
+
+	context_init_halt(my_ctx);
 
 	//printf("producer_ctrl %d init\n", my_pid);
 	while(i < NUMPACKETS)
@@ -723,36 +733,36 @@ void switch_producer_ctrl(void){
 		//requests
 		if(packet_ptr->type == request)
 		{
-			while(desim_list_count(__switch[my_pid]->rx_request_queues[north_queue]) >= MAXQUEUEDEPTH)
+			while(KnightSim_list_count(__switch[my_pid]->rx_request_queues[north_queue]) >= MAXQUEUEDEPTH)
 			{
 				printf("producer_ctrl %d: stalling rx request queue size %d cycle %llu\n",
-						my_pid, desim_list_count(__switch[my_pid]->rx_request_queues[north_queue]), P_TIME);
-				P_PAUSE(1);
+						my_pid, KnightSim_list_count(__switch[my_pid]->rx_request_queues[north_queue]), P_TIME);
+				P_PAUSE(1, my_ctx);
 			}
 
 			//success clear the packet pointer
-			desim_list_enqueue(__switch[my_pid]->rx_request_queues[north_queue], packet_ptr);
+			KnightSim_list_enqueue(__switch[my_pid]->rx_request_queues[north_queue], packet_ptr);
 		}
 		else if(packet_ptr->type == reply)
 		{
-			while(desim_list_count(__switch[my_pid]->rx_reply_queues[north_queue]) >= MAXQUEUEDEPTH)
+			while(KnightSim_list_count(__switch[my_pid]->rx_reply_queues[north_queue]) >= MAXQUEUEDEPTH)
 			{
 				printf("producer_ctrl %d: stalling rx reply queue size %d cycle %llu\n",
-						my_pid, desim_list_count(__switch[my_pid]->rx_reply_queues[north_queue]), P_TIME);
-				P_PAUSE(1);
+						my_pid, KnightSim_list_count(__switch[my_pid]->rx_reply_queues[north_queue]), P_TIME);
+				P_PAUSE(1, my_ctx);
 			}
 
 			//success clear the packet pointer
-			desim_list_enqueue(__switch[my_pid]->rx_reply_queues[north_queue], packet_ptr);
+			KnightSim_list_enqueue(__switch[my_pid]->rx_reply_queues[north_queue], packet_ptr);
 		}
 
 		packets_sent++;
 
 		printf("producer_ctrl %d: success queue size %d cycle %llu\n",
-		my_pid, desim_list_count(__switch[my_pid]->rx_request_queues[north_queue]), P_TIME);
+		my_pid, KnightSim_list_count(__switch[my_pid]->rx_request_queues[north_queue]), P_TIME);
 
-		advance(switch_ec[my_pid]); //wait for entire messages to transfer before signaling the switch
-		P_PAUSE(packet_ptr->size / 8); //transfer time
+		advance(switch_ec[my_pid], my_ctx); //wait for entire messages to transfer before signaling the switch
+		P_PAUSE(packet_ptr->size / 8, my_ctx); //transfer time
 		packet_ptr = NULL;
 		i++;
 	}
@@ -760,7 +770,7 @@ void switch_producer_ctrl(void){
 	//This context finished its work, destroy
 	printf("producer terminating cycle %llu\n", P_TIME);
 	//getchar();
-	context_terminate();
+	context_terminate(my_ctx);
 
 	return;
 }
@@ -809,7 +819,7 @@ void switch_producer_init(void){
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "producer_%d", i);
-		context_create(switch_producer_ctrl, 32768, strdup(buff), i);
+		context_create(switch_producer_ctrl, DEFAULT_STACK_SIZE, strdup(buff), i);
 	}
 
 	srand(time(NULL));
@@ -820,8 +830,16 @@ void switch_producer_init(void){
 void switch_init(void){
 
 	switch_create();
+
+
+
 	switch_create_tasks();
+
+
+
 	switch_create_io_tasks();
+
+
 
 	return;
 }
@@ -840,12 +858,16 @@ void switch_create_tasks(void){
 		switch_ec[i] = eventcount_create(strdup(buff));
 	}
 
+
+
 	for(i = 0; i < NUMSWITCHES; i++)
 	{
 		memset(buff,'\0' , 100);
 		snprintf(buff, 100, "switch_ctrl_%d", i);
-		context_create(switch_ctrl, 32768, strdup(buff), i);
+		context_create(switch_ctrl, DEFAULT_STACK_SIZE, strdup(buff), i);
 	}
+
+
 
 	return;
 }
@@ -871,7 +893,7 @@ void switch_create_io_tasks(void){
 		{
 			memset(buff,'\0' , 100);
 			snprintf(buff, 100, "switch_%d_io_ctrl_%d", __switch[i]->id, j);
-			context_create(switch_io_ctrl, 32768, strdup(buff), j);
+			context_create(switch_io_ctrl, DEFAULT_STACK_SIZE, strdup(buff), j);
 		}
 	}
 
@@ -914,10 +936,10 @@ void switch_create(void){
 		//allocate the queues...
 		for(j = 0; j < __switch[i]->num_ports; j++)
 		{
-			__switch[i]->rx_request_queues[j] = desim_list_create(MAXQUEUEDEPTH);
-			__switch[i]->rx_reply_queues[j] = desim_list_create(MAXQUEUEDEPTH);
-			__switch[i]->tx_request_queues[j] = desim_list_create(MAXQUEUEDEPTH);
-			__switch[i]->tx_reply_queues[j] = desim_list_create(MAXQUEUEDEPTH);
+			__switch[i]->rx_request_queues[j] = KnightSim_list_create(MAXQUEUEDEPTH);
+			__switch[i]->rx_reply_queues[j] = KnightSim_list_create(MAXQUEUEDEPTH);
+			__switch[i]->tx_request_queues[j] = KnightSim_list_create(MAXQUEUEDEPTH);
+			__switch[i]->tx_reply_queues[j] = KnightSim_list_create(MAXQUEUEDEPTH);
 		}
 
 		//create the crossbar

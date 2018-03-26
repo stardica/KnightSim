@@ -7,11 +7,12 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
+#include <pthread.h>
 #include "KnightSim/knightsim.h"
 
 #define NUMSWITCHES 6
 
-#define NUMPACKETS 10
+#define NUMPACKETS 12
 #define NUMPORTS 6
 
 #define MAXQUEUEDEPTH 16
@@ -20,10 +21,10 @@
 #define BUSWIDTH 8
 
 #define P_TIME (etime->count >> 1)
-#define P_PAUSE(p_delay) pause((p_delay)<<1)
+#define P_PAUSE(p_delay, ctx) pause((p_delay)<<1, ctx)
 
-#define ENTER_SUB_CLOCK if (!(etime->count & 0x1)) pause(1);
-#define EXIT_SUB_CLOCK if (etime->count & 0x1) pause(1);
+#define ENTER_SUB_CLOCK(ctx) if (!(etime->count & 0x1)) pause(1, ctx);
+#define EXIT_SUB_CLOCK(ctx) if (etime->count & 0x1) pause(1, ctx);
 
 enum arbitrate{
 	round_robin = 0,
@@ -128,10 +129,10 @@ void switch_create_tasks(void);
 void switch_create_io_tasks(void);
 
 void switch_producer_init(void);
-void switch_producer_ctrl(void);
+void switch_producer_ctrl(context * my_ctx);
 
-void switch_ctrl(void);
-void switch_io_ctrl(void);
+void switch_ctrl(context * my_ctx);
+void switch_io_ctrl(context * my_ctx);
 
 list *switch_io_get_next_rx_queue(struct switch_t *switches, enum port_name port, enum switch_io_lane_map current_io_lane);
 packet *switch_io_ctrl_get_packet(struct switch_t *switches, enum port_name port, enum switch_io_lane_map current_io_lane);

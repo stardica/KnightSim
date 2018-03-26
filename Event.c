@@ -11,10 +11,9 @@
 #include <knightsim.h>
 #include <rdtsc.h>
 
-#define LATENCY 16
 
 
-#define EVENTS 813
+#define EVENTS 1024
 #define TOTAL_CYCLES 1000000
 
 
@@ -26,6 +25,7 @@ void event_init(void);
 long long p_pid = 0;
 
 unsigned long long sim_start = 0;
+unsigned long long sim_end = 0;
 unsigned long long sim_time = 0;
 
 int iters = 0;
@@ -78,18 +78,23 @@ void event(context * my_ctx){
 
 	//int my_pid = p_pid++;
 	/*count_t i = 1;*/
+	volatile int i = 0;
 	context_init_halt(my_ctx);
 
 	while(CYCLE < TOTAL_CYCLES)
 	{
 		//do work
 		//iters++;
+		//sim_start = rdtsc();
+		while(i < 375)
+		   i++;
+		//sim_end = rdtsc();
+		//printf("after %llu\n", sim_end - sim_start);
+		//getchar();
 
 		//printf("event %d cycle %llu\n", my_pid, CYCLE);
 		pause(1, my_ctx);
-
-
-
+		i = 0;
 	}
 
 	//context will terminate

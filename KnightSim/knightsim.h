@@ -89,6 +89,9 @@ struct context_data_t{
 
 #define MAGIC_STACK_NUMBER 4
 
+extern unsigned long long set_start;
+extern unsigned long long set_time;
+
 typedef struct context_data_t context_data;
 typedef struct context_t context;
 typedef struct eventcount_t eventcount;

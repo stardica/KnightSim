@@ -64,6 +64,9 @@ void KnightSim_init(void){
 	snprintf(buff, 100, "etime");
 	etime = eventcount_create(strdup(buff));
 
+
+
+
 	return;
 }
 
@@ -322,7 +325,6 @@ void * context_select(void){
 		do
 		{
 			current_context = ctx_hash_table[etime->count & HASHBY];
-
 		}while(!current_context && etime->count++);
 
 		ctx_hash_table[etime->count & HASHBY] = NULL;
@@ -343,9 +345,9 @@ void * context_select(void){
 }
 
 
-context *context_select_old(void){
+/*context *context_select_old(void){
 
-	/*get next ctx to run*/
+	get next ctx to run
 	current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
 
 	//printf("got context %s\n", current_context->name);
@@ -354,8 +356,8 @@ context *context_select_old(void){
 	{
 		context_end(main_context);
 
-		/*if there isn't a ctx in etime's ctx list the simulation is
-				deadlocked this is a user simulation implementation problem*/
+		if there isn't a ctx in etime's ctx list the simulation is
+				deadlocked this is a user simulation implementation problem
 		printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
 				"Simulation has either ended or there is a problem with the simulation implementation.\n");
 		context_end(main_context);
@@ -363,7 +365,7 @@ context *context_select_old(void){
 
 	etime->count = current_context->count;
 	return current_context;
-}
+}*/
 
 
 void pause(count_t value, context * my_ctx){
