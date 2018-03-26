@@ -7,7 +7,7 @@ CC = gcc
 LIB_NAME_64 = "libKnightSim64.a"
 LIB_NAME_32 = "libKnightSim32.a"
 
-all: makedir knightsim64
+all: makedir knightsim64 knightsim32
 
 knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stack_ptr64.o
 		ar -r ../lib/$(LIB_NAME_64) knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stack_ptr64.o

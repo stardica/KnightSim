@@ -47,10 +47,5 @@ static __inline__ unsigned long long rdtsc(void)
 
 #endif
 
-
-/*  $RCSfile:  $   $Author: kazutomo $
- *  $Revision: 1.6 $  $Date: 2005/04/13 18:49:58 $
- */
-
 #endif
 
