@@ -1,1 +1,1 @@
-# DESim
+# KnightSim
