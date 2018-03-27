@@ -42,7 +42,7 @@ int setjmp32_2(jmp_buf __env);
 void longjmp32_2(jmp_buf __env, int val);
 int encode32(int val);
 int decode32(int val);
-//long long get_stack_ptr32(void);
+long long get_stack_ptr32(void);
 
 #else
 #error Unsupported machine/OS combination
@@ -61,10 +61,8 @@ struct list_t{
 struct eventcount_t{
 	char * name;		/* string name of event count */
 	long long id;
-	struct list_t *ctxlist;
 	count_t count;		/* current value of event */
 	struct context_t *ctx_list;
-	//pthread_mutex_t count_mutex;
 };
 
 //Context objects

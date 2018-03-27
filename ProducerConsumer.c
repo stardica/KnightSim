@@ -2,12 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <string.h>
-
-/*
-#include <cstdlib>
-#include <ctime>
-*/
-
 #include <knightsim.h>
 #include <rdtsc.h>
 
@@ -16,7 +10,6 @@
 #define NUMPAIRS 128
 #define LOOP 1000
 
-/*#define WORK 100000*/
 /*
 #define NUMPAIRS 256
 #define LOOP 10000
@@ -44,9 +37,6 @@
 /*#define LOOP 250000*/
 
 
-
-
-//#define STACKSIZE 16384
 
 eventcount **ec_p;
 eventcount **ec_c;
@@ -80,7 +70,7 @@ int main(void){
 	/*starts simulation and won't return until simulation
 	is complete or all contexts complete*/
 
-	printf("DESIM: Simulating %d pair(s) and %d interactions\n", NUMPAIRS, LOOP);
+	printf("Simulating %d pair(s) and %d interactions\n", NUMPAIRS, LOOP);
 
 	sim_start = rdtsc();
 
@@ -148,41 +138,21 @@ void consumer_init(void){
 void producer(context * my_ctx){
 
 	int my_pid = p_pid++;
-
-	/*count_t i = 1;*/
 	count_t j = 1;
 
-	//int m = 0;
-
 	context_init_halt(my_ctx);
-	//printf("producer %d:\n\t init\n", my_pid);
 
 	while(j <= LOOP)
 	{
 		//do work
 
-		//printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
-		//pause(rand() % LATENCY + 1);
 		pause(1, my_ctx);
-
-		/*printf("producer_event %d cycle %llu\n", my_pid, CYCLE);*/
-
-		/*for(m=0;m<WORK;m++)
-		{
-		;
-		}*/
 
 		iters++;
 
-		//printf("producer %d:\n", my_pid);
-		//printf("\t advancin1g %s cycle %llu\n", ec_c[my_pid]->name, CYCLE);
 		advance(ec_c[my_pid], my_ctx);
 
-		//printf("\t await %s cycle %llu\n", ec_p[my_pid]->name, CYCLE);
-		await(ec_p[my_pid], j, my_ctx);
-		j++;
-		//printf("producer %d:\n", my_pid);
-		//printf("\t advanced and doing work cycle %llu\n", CYCLE);
+		await(ec_p[my_pid], j++, my_ctx);
 	}
 
 	//context will terminate
@@ -192,41 +162,18 @@ void producer(context * my_ctx){
 void consumer(context * my_ctx){
 
 	int my_pid = c_pid++;
-
 	count_t i = 1;
 
-	//int m = 0;
-
 	context_init_halt(my_ctx);
-	//printf("consumer %d:\n\t init\n", my_pid);
 
 	while(1)
 	{
-		//await work
-		//printf("\t await %s\n", ec_c[my_pid]->name);
-
-		await(ec_c[my_pid], i, my_ctx);
-		i++;
+		await(ec_c[my_pid], i++, my_ctx);
 
 		//charge latency
-		//printf("consumer %d:\n", my_pid);
-		//printf("\t charging latency %d cycle %llu\n", LATENCY, CYCLE);
-
-		//do work
-		//pause(rand() % LATENCY + 1);
 		pause(1, my_ctx);
-		//printf("consumer %d:\n\t resuming from latency cycle %llu\n",my_pid, CYCLE);
-
-
-		/*for(m=0;m<WORK;m++)
-		{
-			iters++;
-		}*/
-
+		//do work
 		iters++;
-
-		/*advance producer ctx*/
-		//printf("\t advancing %s cycle %llu\n", ec_p[my_pid]->name, CYCLE);
 
 		advance(ec_p[my_pid], my_ctx);
 	}

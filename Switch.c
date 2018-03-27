@@ -184,14 +184,10 @@ void switch_io_ctrl(context * my_ctx){
 
 	while(1)
 	{
-		set_time = rdtsc() - set_start;
 		await(__switch[switch_pid]->switch_io_ec[port_pid], step, my_ctx);
-		/*printf("test %llu\n", set_time);
-		getchar();
-*/
+
 		//switch has been advanced
 		P_PAUSE(1, my_ctx);
-		set_start = rdtsc();
 
 		net_packet = switch_io_ctrl_get_packet(__switch[switch_pid], (enum port_name)port_pid, current_lane);
 
@@ -312,8 +308,6 @@ void switch_ctrl(context * my_ctx){
 
 				printf("switch %d routing packet id %llu dest %d dest port %d cycle %llu\n",
 						__switch[my_pid]->id, net_packet->id, net_packet->dest[0], net_packet->dest[1], P_TIME);
-
-
 
 				//get a pointer to the output queue
 				out_queue = switch_get_tx_queue(__switch[my_pid], __switch[my_pid]->crossbar->current_port);

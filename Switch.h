@@ -12,7 +12,7 @@
 
 #define NUMSWITCHES 6
 
-#define NUMPACKETS 12
+#define NUMPACKETS 32
 #define NUMPORTS 6
 
 #define MAXQUEUEDEPTH 16

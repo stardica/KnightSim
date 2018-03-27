@@ -13,8 +13,8 @@ knightsim64: knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stac
 		ar -r ../lib/$(LIB_NAME_64) knightsim64.o setjmp64.o longjmp64.o decode64.o encode64.o get_stack_ptr64.o
 		@echo "Built $@ successfully"
 
-knightsim32: knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o
-		ar -r ../lib/$(LIB_NAME_32) knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o
+knightsim32: knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o get_stack_ptr32.o
+		ar -r ../lib/$(LIB_NAME_32) knightsim32.o setjmp32.o longjmp32.o decode32.o encode32.o get_stack_ptr32.o
 		@echo "Built $@ successfully"
 
 makedir:
@@ -39,7 +39,7 @@ encode64.o: encode64.s
 	$(CC) $(CC_FLAGS_64) encode64.s -c
 	
 get_stack_ptr64.o: get_stack_ptr64.s
-	$(CC) $(CC_FLAGS_SO_64) get_stack_ptr64.s -c
+	$(CC) $(CC_FLAGS_64) get_stack_ptr64.s -c
 
 
 #32 bit versions
@@ -57,6 +57,9 @@ decode32.o: decode32.s
 	
 encode32.o: encode32.s
 	$(CC) $(CC_FLAGS_32) encode32.s -c
+	
+get_stack_ptr32.o: get_stack_ptr32.s
+	$(CC) $(CC_FLAGS_32) get_stack_ptr32.s -c
 	
 clean:
 	rm -rf \

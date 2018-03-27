@@ -10,33 +10,12 @@
 
 /* Globals*/
 list *ctxdestroylist = NULL;
-list *ctxlist = NULL;
 list *ecdestroylist = NULL;
-list *threadlist = NULL;
-
-context *last_context = NULL;
 context *current_context = NULL;
-context *ctxhint = NULL;
-context *curctx = NULL;
-context *terminated_context = NULL;
-
 eventcount *etime = NULL;
-
 jmp_buf main_context;
 jmp_buf halt_context;
-
 long long ecid = 0;
-long long ctxid = 0;
-long long threadid = 0;
-
-unsigned long long set_start = 0;
-unsigned long long set_time = 0;
-
-unsigned long long jmp_start = 0;
-unsigned long long jmp_time = 0;
-
-unsigned long long etime_start = 0;
-unsigned long long etime_time = 0;
 
 #define HASHSIZE 16
 #define HASHBY 0xF
@@ -71,7 +50,6 @@ void KnightSim_init(void){
 void KnightSim_dump_queues(void){
 
 	int i = 0;
-	int j = 0;
 	eventcount *ec_ptr = NULL;
 	context *ctx_ptr = NULL;
 
@@ -83,13 +61,11 @@ void KnightSim_dump_queues(void){
 		ec_ptr = (eventcount*)KnightSim_list_get(ecdestroylist, i);
 
 		printf("ec name %s count %llu\n", ec_ptr->name, ec_ptr->count);
-		LIST_FOR_EACH_L(ec_ptr->ctxlist, j, 0)
-		{
-			ctx_ptr = (context *)KnightSim_list_get(ec_ptr->ctxlist, j);
-			printf("\tslot %d ctx %s ec count %llu ctx count %llu\n",
-					j, ctx_ptr->name, ec_ptr->count, ctx_ptr->count);
-		}
+		ctx_ptr = ec_ptr->ctx_list;
 
+		if(ctx_ptr)
+			printf("\tctx %s ec count %llu ctx count %llu\n",
+					ctx_ptr->name, ec_ptr->count, ctx_ptr->count);
 	}
 	printf("\n");
 
@@ -114,9 +90,6 @@ eventcount *eventcount_create(char *name){
 
 void ctx_hash_insert(context *context_ptr, unsigned int where){
 
-	/*assert(context_ptr);
-	assert(context_ptr->batch_next == NULL);*/
-
 	if(!ctx_hash_table[where])
 	{
 		//nothing here
@@ -127,7 +100,6 @@ void ctx_hash_insert(context *context_ptr, unsigned int where){
 	else
 	{
 		//something here stick it at the head
-		/*assert(context_ptr->count == ctx_hash_table[where]->count);*/
 		context_ptr->batch_next = ctx_hash_table[where]; //set new ctx as head
 		ctx_hash_table[where] = context_ptr; //move old ctx down
 	}
@@ -201,7 +173,6 @@ void eventcount_init(eventcount * ec, count_t count, char *ecname){
 	ec->id = ecid++;
 	ec->count = count;
 	ec->ctx_list = NULL;
-	ec->ctxlist = KnightSim_list_create(4);
     return;
 }
 
@@ -270,7 +241,6 @@ void context_init_halt(context * my_ctx){
 
 void context_destroy(context *ctx_ptr){
 
-	//printf("CTX destroying name %s count %llu\n", ctx_ptr->name, ctx_ptr->count);
 	assert(ctx_ptr != NULL);
 	ctx_ptr->start = NULL;
 	free(ctx_ptr->stack);
@@ -284,10 +254,7 @@ void context_destroy(context *ctx_ptr){
 
 void eventcount_destroy(eventcount *ec_ptr){
 
-	//printf("EC destroying name %s count %llu\n", ec_ptr->name, ec_ptr->count);
 	free(ec_ptr->name);
-	KnightSim_list_clear(ec_ptr->ctxlist);
-	KnightSim_list_free(ec_ptr->ctxlist);
 	free(ec_ptr);
 	ec_ptr = NULL;
 
@@ -373,8 +340,7 @@ void await(eventcount *ec, count_t value, context *my_ctx){
 	else
 	{
 		//there is an ec waiting.
-		fatal("await(): fixme handle more than one ctx in ec list name %s in ec %s id %d\n",
-				current_context->name, ec->ctx_list->name, ec->ctx_list->id);
+		fatal("await(): fixme handle more than one ctx in ec list");
 	}
 
 	if(!set_jump(ec->ctx_list->buf)) //update current context
@@ -459,7 +425,16 @@ void context_start(void){
 
 #else
 
-	fatal("context_start(): need to make get stack 32\n");
+	//32 bit is weird we have to hunt around for the struct need to subtract another 24 bytes.
+	unsigned long address = get_stack_ptr32() - (DEFAULT_STACK_SIZE - sizeof(context_data) - MAGIC_STACK_NUMBER - 24);
+	context_data * context_data_ptr = (context_data *)address;
+
+	(*context_data_ptr->ctx_ptr->start)(context_data_ptr->ctx_ptr);
+
+	/*if current current ctx returns i.e. hits the bottom of its function
+	it will return here. So, terminate the context and move on*/
+	context_terminate(context_data_ptr->ctx_ptr);
+
 #endif
 
 	fatal("context_start(): Should never be here!\n");
