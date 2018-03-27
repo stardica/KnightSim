@@ -13,7 +13,7 @@
 
 
 
-#define EVENTS 1024
+#define EVENTS 16
 #define TOTAL_CYCLES 1000000
 
 

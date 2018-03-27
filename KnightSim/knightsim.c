@@ -64,9 +64,6 @@ void KnightSim_init(void){
 	snprintf(buff, 100, "etime");
 	etime = eventcount_create(strdup(buff));
 
-
-
-
 	return;
 }
 
@@ -192,10 +189,6 @@ void context_create(void (*func)(context *), unsigned stacksize, char *name, int
 	assert(etime); //make sure the init is above any context create funcs
 	ctx_hash_insert(new_context_ptr, new_context_ptr->count & HASHBY);
 
-
-	//put in etime's ctx list
-	//KnightSim_list_enqueue(etime->ctxlist, new_context_ptr);
-
 	//for destroying the context later
 	KnightSim_list_enqueue(ctxdestroylist, new_context_ptr);
 
@@ -225,7 +218,6 @@ void advance(eventcount *ec, context *my_ctx){
 	if(ec->ctx_list && ec->ctx_list->count == ec->count)
 	{
 		//there is a context on this ec and it's ready
-
 		ec->ctx_list->batch_next = my_ctx->batch_next;
 		my_ctx->batch_next = ec->ctx_list;
 		ec->ctx_list =  NULL;
@@ -254,17 +246,6 @@ void context_terminate(context * my_ctx){
 		long_jump(context_select());
 	}
 
-
-	/*if(current_context)
-	{
-		context_switch(current_context);
-	}
-	else
-	{
-		etime->count++;
-		context_switch(context_select());
-	}*/
-
 	return;
 }
 
@@ -284,15 +265,12 @@ void context_init_halt(context * my_ctx){
 #else
 #error Unsupported machine/OS combination
 #endif
-
-
 }
 
 
 void context_destroy(context *ctx_ptr){
 
 	//printf("CTX destroying name %s count %llu\n", ctx_ptr->name, ctx_ptr->count);
-
 	assert(ctx_ptr != NULL);
 	ctx_ptr->start = NULL;
 	free(ctx_ptr->stack);
@@ -307,7 +285,6 @@ void context_destroy(context *ctx_ptr){
 void eventcount_destroy(eventcount *ec_ptr){
 
 	//printf("EC destroying name %s count %llu\n", ec_ptr->name, ec_ptr->count);
-
 	free(ec_ptr->name);
 	KnightSim_list_clear(ec_ptr->ctxlist);
 	KnightSim_list_free(ec_ptr->ctxlist);
@@ -337,36 +314,8 @@ void * context_select(void){
 		context_end(main_context);
 	}
 
-	//printf("************etime****************** cycle %llu\n", etime->count);
-
-	//get count of batch
-	//assert(etime->count == current_context->count);
 	return (void *)current_context->buf;
 }
-
-
-/*context *context_select_old(void){
-
-	get next ctx to run
-	current_context = (context*)KnightSim_list_dequeue(etime->ctxlist);
-
-	//printf("got context %s\n", current_context->name);
-
-	if(!current_context)
-	{
-		context_end(main_context);
-
-		if there isn't a ctx in etime's ctx list the simulation is
-				deadlocked this is a user simulation implementation problem
-		printf("KnightSim: deadlock detected now exiting... all contexts are in an await state.\n"
-				"Simulation has either ended or there is a problem with the simulation implementation.\n");
-		context_end(main_context);
-	}
-
-	etime->count = current_context->count;
-	return current_context;
-}*/
-
 
 void pause(count_t value, context * my_ctx){
 	//we only ever pause on etime.
@@ -378,11 +327,8 @@ void pause(count_t value, context * my_ctx){
 	context *head_ptr = my_ctx;
 	my_ctx = my_ctx->batch_next;
 
-	//top_context->count = value;
-
 	//insert my self into the hash table
 	ctx_hash_insert(head_ptr, value & HASHBY);
-
 
 	if(!set_jump(head_ptr->buf)) //update current context
 	{
@@ -392,24 +338,10 @@ void pause(count_t value, context * my_ctx){
 		}
 		else
 		{
-			/*fatal("fix me pause\n");*/
 			etime->count++;
-
 			long_jump(context_select());
 		}
 	}
-
-	/*if(current_context)
-	{
-		//if there is another context run it
-		context_switch(current_context);
-	}
-	else
-	{
-		//we are out of contexts so get the next batch
-		etime->count++;
-		context_switch(context_select());
-	}*/
 
 	return;
 }
@@ -428,12 +360,7 @@ void await(eventcount *ec, count_t value, context *my_ctx){
 	/*the current context must now wait on this ec to be incremented*/
 	if(!ec->ctx_list)
 	{
-		//printf("await(): fixme handle more than one ctx in ec list name %s in ec %s\n",
-		//current_context->name, ec->ctx_list->name);
-
 		//nothing in EC's list
-		/*printf("await %s\n", current_context->name);*/
-
 		//set the count to await
 		my_ctx->count = value;
 
@@ -442,10 +369,6 @@ void await(eventcount *ec, count_t value, context *my_ctx){
 
 		//set curr ctx to next ctx in list (NOTE MAYBE NULL!!)
 		my_ctx = my_ctx->batch_next;
-
-		//update the tail pointer in ec's ctx list
-		//ec->ctx_list->batch_next = NULL;
-
 	}
 	else
 	{
@@ -467,18 +390,6 @@ void await(eventcount *ec, count_t value, context *my_ctx){
 		}
 	}
 
-	/*if(current_context)
-	{
-		//if there is another context run it
-		context_switch(current_context);
-	}
-	else
-	{
-		//we are out of contexts so get the next batch
-		etime->count++;
-		context_switch(context_select());
-	}*/
-
 	return;
 }
 
@@ -486,24 +397,11 @@ void await(eventcount *ec, count_t value, context *my_ctx){
 
 void simulate(void){
 
-	/*current_context = NULL;
-	last_context = NULL;*/
-
-	/*while(ctx_hash_table[0])
-	{
-		printf("ctx name %s\n", ctx_hash_table[0]->name);
-		ctx_hash_table[0] = ctx_hash_table[0]->batch_next;
-	}
-
-	fatal("GOOD\n");*/
-
-
 	//simulate
 	if(!context_simulate(main_context))
 	{
 		/*This is the beginning of the simulation
 		 * get the first ctx and run it*/
-
 		long_jump(context_select());
 	}
 
@@ -548,11 +446,11 @@ void KnightSim_clean_up(void){
 void context_start(void){
 
 	//start of the context...
+
 #if defined(__linux__) && defined(__x86_64)
 	long long address = get_stack_ptr64() - (DEFAULT_STACK_SIZE - sizeof(context_data) - MAGIC_STACK_NUMBER);
 	context_data * context_data_ptr = (context_data *)address;
 
-	//jump
 	(*context_data_ptr->ctx_ptr->start)(context_data_ptr->ctx_ptr);
 
 	/*if current current ctx returns i.e. hits the bottom of its function
@@ -594,44 +492,11 @@ void long_jump(jmp_buf buf){
 	return;
 }
 
-void context_switch(context *ctx_ptr)
-{
-	//setjmp returns 1 if jumping to this position via longjmp
-
-	/*ok, this is deep wizardry....
-	note that the jump is to the next context and the
-	setjmp is for the current context*/
-
-	/*printf("ctx switch():\n");*/
-
-#if defined(__linux__) && defined(__i386__)
-	if (!last_context || !setjmp32_2(last_context->buf))
-	{
-	  last_context = ctx_ptr;
-	  longjmp32_2(ctx_ptr->buf, 1);
-	}
-#elif defined(__linux__) && defined(__x86_64)
-	if (!last_context || !setjmp64_2(last_context->buf))
-	{
-		last_context = ctx_ptr;
-		longjmp64_2(ctx_ptr->buf, 1);
-	}
-#else
-#error Unsupported machine/OS combination
-#endif
-
-	/*check for context to destroy*/
-
-	return;
-}
 
 int context_simulate(jmp_buf buf){
-
 #if defined(__linux__) && defined(__i386__)
-	//fatal("OMG AGAIN!!!!\n");
 	return setjmp32_2(buf);
 #elif defined(__linux__) && defined(__x86_64)
-	//fatal("OMG\n");
 	return setjmp64_2(buf);
 #else
 #error Unsupported machine/OS combination
@@ -639,7 +504,6 @@ int context_simulate(jmp_buf buf){
 }
 
 void context_end(jmp_buf buf){
-
 #if defined(__linux__) && defined(__i386__)
 	longjmp32_2(buf, 1);
 #elif defined(__linux__) && defined(__x86_64)
@@ -647,7 +511,6 @@ void context_end(jmp_buf buf){
 #else
 #error Unsupported machine/OS combination
 #endif
-
 	return;
 }
 

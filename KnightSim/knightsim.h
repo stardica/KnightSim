@@ -129,7 +129,6 @@ void context_start(void);
 int context_simulate(jmp_buf buf);
 void context_end(jmp_buf buf);
 void * context_select(void);
-void context_switch(context *ctx_ptr);
 void context_destroy(context *ctx_ptr);
 void KnightSim_clean_up(void);
 
